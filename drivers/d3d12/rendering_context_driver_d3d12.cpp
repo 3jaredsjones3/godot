@@ -72,9 +72,11 @@ const GUID CLSID_D3D12DebugGodot = { 0xf2352aeb, 0xdd84, 0x49fe, { 0xb9, 0x7b, 0
 const GUID CLSID_D3D12SDKConfigurationGodot = { 0x7cda6aca, 0xa03e, 0x49c8, { 0x94, 0x58, 0x03, 0x34, 0xd2, 0x0e, 0x07, 0xce } };
 
 #ifdef PIX_ENABLED
-#if defined(__GNUC__)
-#define _MSC_VER 1800
+#if defined(__GNUC__) && !defined(_MSC_VER)
+// If PIX requires `_MSC_VER`, define a custom macro instead.
+#define GODOT_USE_FAKE_MSC_VER
 #endif
+
 #define USE_PIX
 #include "WinPixEventRuntime/pix3.h"
 #if defined(__GNUC__)

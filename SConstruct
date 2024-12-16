@@ -217,6 +217,9 @@ opts.Add(BoolVariable("deprecated", "Enable compatibility code for deprecated an
 opts.Add(EnumVariable("precision", "Set the floating-point precision level", "single", ("single", "double")))
 opts.Add(BoolVariable("minizip", "Enable ZIP archive support using minizip", True))
 opts.Add(BoolVariable("brotli", "Enable Brotli for decompresson and WOFF2 fonts support", True))
+opts.Add(BoolVariable("simd", "Enable SIMD optimizations", True))
+opts.Add(EnumVariable("simd_arch", "SIMD instruction set architecture", "auto", 
+    ("auto", "none", "sse2", "sse3", "ssse3", "sse4.1", "avx", "avx2", "neon")))
 opts.Add(BoolVariable("xaudio2", "Enable the XAudio2 audio driver on supported platforms", False))
 opts.Add(BoolVariable("vulkan", "Enable the vulkan rendering driver", True))
 opts.Add(BoolVariable("opengl3", "Enable the OpenGL/GLES3 rendering driver", True))
@@ -615,6 +618,60 @@ if env["production"]:
 
 if env["strict_checks"]:
     env.Append(CPPDEFINES=["STRICT_CHECKS"])
+
+# Configure SIMD settings
+if env["simd"]:
+    if env["simd_arch"] == "auto":
+        if env["arch"] == "x86_32" or env["arch"] == "x86_64":
+            # Default to SSE2 for x86 architectures
+            if env.msvc:
+                env.Append(CCFLAGS=["/arch:SSE2"])
+            else:
+                env.Append(CCFLAGS=["-msse2"])
+                env.Append(CPPDEFINES=["SIMD_ENABLED", "SSE2_ENABLED"])
+        elif env["arch"] == "arm64" or env["platform"] == "android":
+            # ARM64 always has NEON
+            env.Append(CPPDEFINES=["SIMD_ENABLED", "NEON_ENABLED"])
+            if not env["platform"] == "android":  # Android NDK handles this automatically
+                env.Append(CCFLAGS=["-mfpu=neon"])
+    else:
+        # Manual SIMD architecture selection
+        if env["simd_arch"] != "none":
+            env.Append(CPPDEFINES=["SIMD_ENABLED"])
+            if env["simd_arch"] == "sse2":
+                if env.msvc:
+                    env.Append(CCFLAGS=["/arch:SSE2"])
+                else:
+                    env.Append(CCFLAGS=["-msse2"])
+                env.Append(CPPDEFINES=["SSE2_ENABLED"])
+            elif env["simd_arch"] == "sse3":
+                if not env.msvc:  # MSVC doesn't have specific SSE3 switch
+                    env.Append(CCFLAGS=["-msse3"])
+                env.Append(CPPDEFINES=["SSE3_ENABLED"])
+            elif env["simd_arch"] == "ssse3":
+                if not env.msvc:
+                    env.Append(CCFLAGS=["-mssse3"])
+                env.Append(CPPDEFINES=["SSSE3_ENABLED"])
+            elif env["simd_arch"] == "sse4.1":
+                if not env.msvc:
+                    env.Append(CCFLAGS=["-msse4.1"])
+                env.Append(CPPDEFINES=["SSE4_1_ENABLED"])
+            elif env["simd_arch"] == "avx":
+                if env.msvc:
+                    env.Append(CCFLAGS=["/arch:AVX"])
+                else:
+                    env.Append(CCFLAGS=["-mavx"])
+                env.Append(CPPDEFINES=["AVX_ENABLED"])
+            elif env["simd_arch"] == "avx2":
+                if env.msvc:
+                    env.Append(CCFLAGS=["/arch:AVX2"])
+                else:
+                    env.Append(CCFLAGS=["-mavx2"])
+                env.Append(CPPDEFINES=["AVX2_ENABLED"])
+            elif env["simd_arch"] == "neon":
+                env.Append(CPPDEFINES=["NEON_ENABLED"])
+                if not env["platform"] == "android":
+                    env.Append(CCFLAGS=["-mfpu=neon"])
 
 # Run SCU file generation script if in a SCU build.
 if env["scu_build"]:
