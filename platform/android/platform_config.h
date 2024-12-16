@@ -28,9 +28,5 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#ifdef _MSC_VER
-#include <malloc.h> // MSVC-specific header for alloca
-#else
-#include <alloca.h> // Standard header for alloca
-#endif
-
+#include <alloca.h>
+#include <malloc.h>

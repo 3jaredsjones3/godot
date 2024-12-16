@@ -6,6 +6,7 @@
 #include "core/math/math_defs.h"
 #include "core/math/math_funcs.h"
 #include "core/math/vector3.h"
+#include <cmath> // Include for isnan and isinf
 
 // Architecture detection
 #if defined(__SSE__) || defined(__x86_64__) || defined(_M_X64)
@@ -207,8 +208,6 @@ struct alignas(16) Vector3SIMD {
         float len = length();
         if (len > 0) {
             *this *= 1.0f / len;
-        } else {
-            zero();
         }
     }
 

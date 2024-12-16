@@ -184,10 +184,7 @@ struct [[nodiscard]] alignas(16) Vector4 {
 		return dot(*this);
 	}
 
-	// Methods implemented as per the original vector4.cpp
-
 	_FORCE_INLINE_ Axis min_axis_index() const {
-		// Reproduce original logic: choose the axis with the smallest value, last in tie
 		uint32_t min_index = 0;
 		real_t min_value = x;
 		for (uint32_t i = 1; i < 4; i++) {
@@ -209,6 +206,25 @@ struct [[nodiscard]] alignas(16) Vector4 {
 			}
 		}
 		return Axis(max_index);
+	}
+
+	// Additions start here
+	_FORCE_INLINE_ Vector4 min(const Vector4 &p_vec4) const {
+		return Vector4(_mm_min_ps(m_value, p_vec4.m_value));
+	}
+
+	_FORCE_INLINE_ Vector4 minf(real_t p_val) const {
+		__m128 scalar = load_scalar(p_val);
+		return Vector4(_mm_min_ps(m_value, scalar));
+	}
+
+	_FORCE_INLINE_ Vector4 max(const Vector4 &p_vec4) const {
+		return Vector4(_mm_max_ps(m_value, p_vec4.m_value));
+	}
+
+	_FORCE_INLINE_ Vector4 maxf(real_t p_val) const {
+		__m128 scalar = load_scalar(p_val);
+		return Vector4(_mm_max_ps(m_value, scalar));
 	}
 
 	_FORCE_INLINE_ bool is_equal_approx(const Vector4 &p_vec4) const {
@@ -268,23 +284,17 @@ struct [[nodiscard]] alignas(16) Vector4 {
 		return ret;
 	}
 
-	// For abs, sign, floor, ceil, round - we have SSE variants, but original uses Math::
-	// We'll do SSE for floor,ceil,round,abs and a SSE approach for sign.
-
 	_FORCE_INLINE_ Vector4 abs() const {
 		const __m128 sign_mask = _mm_set1_ps(-0.0f);
 		return Vector4(_mm_andnot_ps(sign_mask, m_value));
 	}
 
 	_FORCE_INLINE_ Vector4 sign() const {
-		// sign: -1 if <0, 1 if >0, 0 if =0
 		__m128 zero = _mm_setzero_ps();
 		__m128 cmp_gt = _mm_cmpgt_ps(m_value, zero);
 		__m128 cmp_lt = _mm_cmplt_ps(m_value, zero);
 		__m128 pos_ones = _mm_and_ps(cmp_gt, _mm_set1_ps(1.0f));
 		__m128 neg_ones = _mm_and_ps(cmp_lt, _mm_set1_ps(-1.0f));
-
-		// If we need to handle zero exactly, it will remain zero since not in >0 or <0.
 		return Vector4(_mm_or_ps(pos_ones, neg_ones));
 	}
 
@@ -301,7 +311,6 @@ struct [[nodiscard]] alignas(16) Vector4 {
 	}
 
 	_FORCE_INLINE_ Vector4 lerp(const Vector4 &p_to, real_t p_weight) const {
-		// Use scalar lerp for each component
 		return Vector4(Math::lerp(x, p_to.x, p_weight),
 					   Math::lerp(y, p_to.y, p_weight),
 					   Math::lerp(z, p_to.z, p_weight),
@@ -309,7 +318,6 @@ struct [[nodiscard]] alignas(16) Vector4 {
 	}
 
 	_FORCE_INLINE_ Vector4 cubic_interpolate(const Vector4 &p_b, const Vector4 &p_pre_a, const Vector4 &p_post_b, real_t p_weight) const {
-		// scalar fallback, using Math::cubic_interpolate
 		return Vector4(
 			Math::cubic_interpolate(x, p_b.x, p_pre_a.x, p_post_b.x, p_weight),
 			Math::cubic_interpolate(y, p_b.y, p_pre_a.y, p_post_b.y, p_weight),
@@ -319,7 +327,6 @@ struct [[nodiscard]] alignas(16) Vector4 {
 	}
 
 	_FORCE_INLINE_ Vector4 cubic_interpolate_in_time(const Vector4 &p_b, const Vector4 &p_pre_a, const Vector4 &p_post_b, real_t p_weight, real_t p_b_t, real_t p_pre_a_t, real_t p_post_b_t) const {
-		// scalar fallback
 		return Vector4(
 			Math::cubic_interpolate_in_time(x, p_b.x, p_pre_a.x, p_post_b.x, p_weight, p_b_t, p_pre_a_t, p_post_b_t),
 			Math::cubic_interpolate_in_time(y, p_b.y, p_pre_a.y, p_post_b.y, p_weight, p_b_t, p_pre_a_t, p_post_b_t),
@@ -368,36 +375,16 @@ struct [[nodiscard]] alignas(16) Vector4 {
 		return v;
 	}
 
-	_FORCE_INLINE_ Vector4 clamp(const Vector4 &p_min, const Vector4 &p_max) const {
-		// clamp: max(p_min, min(*this, p_max))
-		__m128 mn = p_min.m_value;
-		__m128 mx = p_max.m_value;
-		__m128 val = m_value;
-		val = _mm_min_ps(val, mx);
-		val = _mm_max_ps(val, mn);
-		return Vector4(val);
-	}
-
-	_FORCE_INLINE_ Vector4 clampf(real_t p_min, real_t p_max) const {
-		__m128 mn = load_scalar(p_min);
-		__m128 mx = load_scalar(p_max);
-		__m128 val = m_value;
-		val = _mm_min_ps(val, mx);
-		val = _mm_max_ps(val, mn);
-		return Vector4(val);
-	}
-
 	_FORCE_INLINE_ Vector4 inverse() const {
-		// Inverse: 1/x, 1/y, 1/z, 1/w. If zero occurs, original doesn't handle gracefully.
 		__m128 ones = _mm_set1_ps(1.0f);
 		return Vector4(_mm_div_ps(ones, m_value));
 	}
 
 	operator String() const {
 		return "(" + String::num_real(x, true) + ", " +
-		            String::num_real(y, true) + ", " +
-		            String::num_real(z, true) + ", " +
-		            String::num_real(w, true) + ")";
+			   String::num_real(y, true) + ", " +
+			   String::num_real(z, true) + ", " +
+			   String::num_real(w, true) + ")";
 	}
 
 	operator Vector4i() const {
@@ -412,12 +399,15 @@ struct [[nodiscard]] alignas(16) Vector4 {
 _FORCE_INLINE_ Vector4 operator*(float p_scalar, const Vector4 &p_vec) {
 	return p_vec * p_scalar;
 }
+
 _FORCE_INLINE_ Vector4 operator*(double p_scalar, const Vector4 &p_vec) {
 	return p_vec * (real_t)p_scalar;
 }
+
 _FORCE_INLINE_ Vector4 operator*(int32_t p_scalar, const Vector4 &p_vec) {
 	return p_vec * (real_t)p_scalar;
 }
+
 _FORCE_INLINE_ Vector4 operator*(int64_t p_scalar, const Vector4 &p_vec) {
 	return p_vec * (real_t)p_scalar;
 }
