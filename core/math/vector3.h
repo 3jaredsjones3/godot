@@ -101,16 +101,16 @@ struct [[nodiscard]] Vector3 {
                          MIN(z, p_vector3.z));
      }
 
-     inline Vector3 minf(real_t p_scalar) const {
+inline Vector3 minf(real_t p_scalar) const {
 #if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_result = simd_this.minf(p_scalar);
-          if (!simd_result.has_error()) {
-               return (Vector3)simd_result;
-          }
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_result = simd_this.minf(p_scalar);
+    if (!simd_result.has_error()) {
+        return (Vector3)simd_result;
+    }
 #endif
-          return scalar_minf(p_scalar);
-     }
+    return Vector3(MIN(x, p_scalar), MIN(y, p_scalar), MIN(z, p_scalar));
+}
 
      Vector3 scalar_minf(real_t p_scalar) const;
 
@@ -128,16 +128,16 @@ struct [[nodiscard]] Vector3 {
                          MAX(z, p_vector3.z));
      }
 
-     inline Vector3 maxf(real_t p_scalar) const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_result = simd_this.maxf(p_scalar);
-          if (!simd_result.has_error()) {
-               return (Vector3)simd_result;
-          }
+inline Vector3 maxf(real_t p_scalar) const {
+#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)  
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_result = simd_this.maxf(p_scalar);
+    if (!simd_result.has_error()) {
+        return (Vector3)simd_result;
+    }
 #endif
-          return scalar_maxf(p_scalar);
-     }
+    return Vector3(MAX(x, p_scalar), MAX(y, p_scalar), MAX(z, p_scalar));
+}
 
      Vector3 scalar_maxf(real_t p_scalar) const;
 
