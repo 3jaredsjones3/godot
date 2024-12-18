@@ -44,6 +44,14 @@ const Vector3& Vector3::get_zero_vector() {
     return zero_vector;
 }
 
+Vector3 Vector3::maxf(real_t p_scalar) const {
+    return Vector3(MAX(x, p_scalar), MAX(y, p_scalar), MAX(z, p_scalar));
+}
+
+Vector3 Vector3::minf(real_t p_scalar) const {
+    return Vector3(MIN(x, p_scalar), MIN(y, p_scalar), MIN(z, p_scalar));
+}
+
 real_t Vector3::scalar_length() const {
     real_t x2 = x * x;
     real_t y2 = y * y;
