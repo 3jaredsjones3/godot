@@ -36,7 +36,21 @@
 #include "core/string/ustring.h"
 
 // Define the static zero vector
-const Vector3 Vector3::zero(0.0f, 0.0f, 0.0f);
+const Vector3 Vector3::_zero(0.0f, 0.0f, 0.0f);
+
+// Public access method that returns reference to static zero
+const Vector3& Vector3::get_zero_vector() {
+    static const Vector3 zero_vector(0.0f, 0.0f, 0.0f);
+    return zero_vector;
+}
+
+// Define the zero() method
+void Vector3::zero() {
+    x = 0.0f;
+    y = 0.0f;
+    z = 0.0f;
+}
+
 
 real_t Vector3::scalar_length() const {
     real_t x2 = x * x;

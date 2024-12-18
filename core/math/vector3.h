@@ -57,8 +57,14 @@ struct [[nodiscard]] Vector3 {
         };
         real_t coord[3];
     };
+    
+    static const Vector3& get_zero_vector(); // New static method
+    inline void zero(); // Keeps the method declaration
 
-    static const Vector3 zero; // Static zero vector
+    private:
+        static const Vector3 _zero;  // Internal static member
+
+    public:
 
     inline const real_t &operator[](int p_axis) const {
         DEV_ASSERT((unsigned int)p_axis < 3);
@@ -209,7 +215,7 @@ struct [[nodiscard]] Vector3 {
         real_t start_length = Math::sqrt(start_length_sq);
         real_t result_length = Math::lerp(start_length, Math::sqrt(end_length_sq), p_weight);
         real_t angle = angle_to(p_to);
-        return rotated(axis, angle * p_weight) * (real_t)(result_length / start_length);
+        return rotated(axis, angle * p_weight) * ((real_t)result_length / (real_t)start_length);
     }
 
     inline Vector3 cubic_interpolate(const Vector3 &p_b, const Vector3 &p_pre_a, const Vector3 &p_post_b, real_t p_weight) const {
@@ -297,7 +303,8 @@ struct [[nodiscard]] Vector3 {
 #ifdef MATH_CHECKS
         ERR_FAIL_COND_V_MSG(!p_normal.is_normalized(), Vector3(), "The normal Vector3 must be normalized.");
 #endif
-        return (2.0f * p_normal * dot(p_normal)) - *this;
+        // Disambiguate by using parentheses and casts if needed
+        return ((p_normal * 2.0f) * dot(p_normal)) - *this;
     }
 
     bool is_equal_approx(const Vector3 &p_v) const;
@@ -458,21 +465,21 @@ struct [[nodiscard]] Vector3 {
     }
 };
 
-// Global scalar multiplication operators
+// Global scalar * Vector3 operators only
 inline Vector3 operator*(float p_scalar, const Vector3 &p_vec) {
-    return Vector3(p_vec.x * p_scalar, p_vec.y * p_scalar, p_vec.z * p_scalar);
+    return p_vec * (real_t)p_scalar; 
 }
 
 inline Vector3 operator*(double p_scalar, const Vector3 &p_vec) {
-    return Vector3((real_t)p_vec.x * (real_t)p_scalar, (real_t)p_vec.y * (real_t)p_scalar, (real_t)p_vec.z * (real_t)p_scalar);
+    return p_vec * (real_t)p_scalar;
 }
 
 inline Vector3 operator*(int32_t p_scalar, const Vector3 &p_vec) {
-    return Vector3(p_vec.x * p_scalar, p_vec.y * p_scalar, p_vec.z * p_scalar);
+    return p_vec * (real_t)p_scalar;
 }
 
 inline Vector3 operator*(int64_t p_scalar, const Vector3 &p_vec) {
-    return Vector3((real_t)p_vec.x * (real_t)p_scalar, (real_t)p_vec.y * (real_t)p_scalar, (real_t)p_vec.z * (real_t)p_scalar);
+    return p_vec * (real_t)p_scalar;
 }
 
 inline Vector3 vec3_cross(const Vector3 &p_a, const Vector3 &p_b) {
