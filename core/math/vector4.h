@@ -380,6 +380,16 @@ struct [[nodiscard]] alignas(16) Vector4 {
 		return Vector4(_mm_div_ps(ones, m_value));
 	}
 
+	_FORCE_INLINE_ Vector4 clamp(const Vector4 &p_min, const Vector4 &p_max) const {
+    	return Vector4(_mm_min_ps(_mm_max_ps(m_value, p_min.m_value), p_max.m_value));
+	}
+
+	_FORCE_INLINE_ Vector4 clampf(real_t p_min, real_t p_max) const {
+    	__m128 min_val = _mm_set1_ps(p_min);
+    	__m128 max_val = _mm_set1_ps(p_max);
+    	return Vector4(_mm_min_ps(_mm_max_ps(m_value, min_val), max_val));
+	}
+
 	operator String() const {
 		return "(" + String::num_real(x, true) + ", " +
 			   String::num_real(y, true) + ", " +
