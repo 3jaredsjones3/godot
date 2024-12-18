@@ -59,7 +59,12 @@ struct [[nodiscard]] Vector3 {
     };
     
     static const Vector3& get_zero_vector(); // New static method
-    inline void zero(); // Keeps the method declaration
+    
+    inline void zero() {
+        x = 0.0f;
+        y = 0.0f; 
+        z = 0.0f;
+    } 
 
     private:
         static const Vector3 _zero;  // Internal static member

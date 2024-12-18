@@ -204,6 +204,63 @@ struct alignas(16) Vector3SIMD {
 #endif
     }
 
+    // Min/Max operations
+    inline Vector3SIMD min(const Vector3SIMD &p_v) const {
+    #if defined(VECTOR3SIMD_USE_SSE)
+        return Vector3SIMD(_mm_min_ps(m_value, p_v.m_value));
+    #elif defined(VECTOR3SIMD_USE_NEON)
+        return Vector3SIMD(vminq_f32(m_value, p_v.m_value));
+    #else
+        return Vector3SIMD(
+            MIN(f[0], p_v.f[0]),
+            MIN(f[1], p_v.f[1]),
+            MIN(f[2], p_v.f[2])
+        );
+    #endif
+    }
+
+    inline Vector3SIMD minf(float p_scalar) const {
+    #if defined(VECTOR3SIMD_USE_SSE)
+        return Vector3SIMD(_mm_min_ps(m_value, _mm_set1_ps(p_scalar)));
+    #elif defined(VECTOR3SIMD_USE_NEON)
+        return Vector3SIMD(vminq_f32(m_value, vdupq_n_f32(p_scalar)));
+    #else
+        return Vector3SIMD(
+            MIN(f[0], p_scalar),
+            MIN(f[1], p_scalar),
+            MIN(f[2], p_scalar)
+        );
+    #endif
+    }
+
+    inline Vector3SIMD max(const Vector3SIMD &p_v) const {
+    #if defined(VECTOR3SIMD_USE_SSE)
+        return Vector3SIMD(_mm_max_ps(m_value, p_v.m_value));
+    #elif defined(VECTOR3SIMD_USE_NEON)
+        return Vector3SIMD(vmaxq_f32(m_value, p_v.m_value));
+    #else
+        return Vector3SIMD(
+            MAX(f[0], p_v.f[0]),
+            MAX(f[1], p_v.f[1]),
+            MAX(f[2], p_v.f[2])
+        );
+    #endif
+    }
+
+    inline Vector3SIMD maxf(float p_scalar) const {
+    #if defined(VECTOR3SIMD_USE_SSE)
+        return Vector3SIMD(_mm_max_ps(m_value, _mm_set1_ps(p_scalar)));
+    #elif defined(VECTOR3SIMD_USE_NEON)
+        return Vector3SIMD(vmaxq_f32(m_value, vdupq_n_f32(p_scalar)));
+    #else
+        return Vector3SIMD(
+            MAX(f[0], p_scalar),
+            MAX(f[1], p_scalar),
+            MAX(f[2], p_scalar)
+        );
+    #endif
+    }
+
     inline float length() const {
         return Math::sqrt(length_squared());
     }
