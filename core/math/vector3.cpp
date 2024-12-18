@@ -44,14 +44,6 @@ const Vector3& Vector3::get_zero_vector() {
     return zero_vector;
 }
 
-// Define the zero() method
-void Vector3::zero() {
-    x = 0.0f;
-    y = 0.0f;
-    z = 0.0f;
-}
-
-
 real_t Vector3::scalar_length() const {
     real_t x2 = x * x;
     real_t y2 = y * y;
