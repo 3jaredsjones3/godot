@@ -35,11 +35,13 @@
 #include "core/math/vector3.h"
 
 struct [[nodiscard]] Basis {
-	Vector3 rows[3] = {
-		Vector3(1, 0, 0),
-		Vector3(0, 1, 0),
-		Vector3(0, 0, 1)
-	};
+	Vector3 rows[3];
+
+	Basis() {
+		rows[0] = Vector3(1, 0, 0);
+		rows[1] = Vector3(0, 1, 0);
+		rows[2] =Vector3(0, 0, 1);
+	}
 
 	_FORCE_INLINE_ const Vector3 &operator[](int p_row) const {
 		return rows[p_row];
@@ -187,10 +189,11 @@ struct [[nodiscard]] Basis {
 	}
 
 	_FORCE_INLINE_ void set_zero() {
-		rows[0].zero();
-		rows[1].zero();
-		rows[2].zero();
+    	rows[0] = Vector3::zero;
+    	rows[1] = Vector3::zero;
+    	rows[2] = Vector3::zero;
 	}
+
 
 	_FORCE_INLINE_ Basis transpose_xform(const Basis &p_m) const {
 		return Basis(
