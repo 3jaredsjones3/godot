@@ -46,6 +46,15 @@ Vector3::Vector3(real_t p_x, real_t p_y, real_t p_z) {
     z = p_z;
 }
 
+// Distance calculations
+real_t Vector3::distance_to(const Vector3 &p_to) const {
+	return (p_to - *this).length();
+}
+
+real_t Vector3::distance_squared_to(const Vector3 &p_to) const {
+	return (p_to - *this).length_squared();
+}
+
 void Vector3::rotate(const Vector3 &p_axis, real_t p_angle) {
     *this = Basis(p_axis, p_angle).xform(*this);
 }
@@ -243,12 +252,15 @@ real_t Vector3::length_squared() const {
 }
 
 void Vector3::normalize() {
-    real_t l = length();
-    if (l > 0) {
-        x /= l;
-        y /= l;
-        z /= l;
-    }
+	real_t lengthsq = length_squared();
+	if (lengthsq == 0) {
+		x = y = z = 0;
+	} else {
+		real_t length = Math::sqrt(lengthsq);
+		x /= length;
+		y /= length;
+		z /= length;
+	}
 }
 
 Vector3 Vector3::normalized() const {
@@ -284,6 +296,114 @@ Vector3 Vector3::round() const {
 Vector3 Vector3::inverse() const {
     return Vector3(1.0f / x, 1.0f / y, 1.0f / z);
 }
+
+Vector3 Vector3::project(const Vector3 &p_to) const {
+	return p_to * (dot(p_to) / p_to.length_squared());
+} //maybe this could use SIMD and be put in vector3SIMD.h
+
+real_t Vector3::angle_to(const Vector3 &p_to) const {
+	return Math::atan2(cross(p_to).length(), dot(p_to));
+} //maybe this could use SIMD and be put in vector3SIMD.h
+
+real_t Vector3::signed_angle_to(const Vector3 &p_to, const Vector3 &p_axis) const {
+	Vector3 cross_to = cross(p_to);
+	real_t unsigned_angle = Math::atan2(cross_to.length(), dot(p_to));
+	real_t sign = cross_to.dot(p_axis);
+	return (sign < 0) ? -unsigned_angle : unsigned_angle;
+} //maybe this could use SIMD and be put in vector3SIMD.h
+
+Vector3 Vector3::direction_to(const Vector3 &p_to) const {
+	Vector3 ret(p_to.x - x, p_to.y - y, p_to.z - z);
+	ret.normalize();
+	return ret;
+} //maybe this could use SIMD and be put in vector3SIMD.h
+
+// slide returns the component of the vector along the given plane, specified by its normal vector.
+Vector3 Vector3::slide(const Vector3 &p_normal) const {
+#ifdef MATH_CHECKS
+	ERR_FAIL_COND_V_MSG(!p_normal.is_normalized(), Vector3(), "The normal Vector3 " + p_normal.operator String() + " must be normalized.");
+    // perhaps we could just normalize the vector for them if they do not have it normalized already
+    // we could just output a message about how the operation would proceed faster if they already had it normalized (important if the operation is called many times with the same normal)
+#endif
+	return *this - p_normal * dot(p_normal);
+} //maybe this could use SIMD and be put in vector3SIMD.h
+
+Vector3 Vector3::bounce(const Vector3 &p_normal) const {
+	return -reflect(p_normal);
+}
+
+Vector3 Vector3::reflect(const Vector3 &p_normal) const {
+#ifdef MATH_CHECKS
+	ERR_FAIL_COND_V_MSG(!p_normal.is_normalized(), Vector3(), "The normal Vector3 " + p_normal.operator String() + " must be normalized.");
+    // perhaps we could just normalize the vector for them if they do not have it normalized already
+    // we could just output a message about how the operation would proceed faster if they already had it normalized (important if the operation is called many times with the same normal)
+#endif
+	return 2.0f * p_normal * dot(p_normal) - *this;
+} //maybe this could use SIMD and be put in vector3SIMD.h
+
+Vector3 Vector3::lerp(const Vector3 &p_to, real_t p_weight) const {
+	Vector3 res = *this;
+	res.x = Math::lerp(res.x, p_to.x, p_weight);
+	res.y = Math::lerp(res.y, p_to.y, p_weight);
+	res.z = Math::lerp(res.z, p_to.z, p_weight);
+	return res;
+} //I'm not sure if SIMD could be used here... but maybe?
+
+Vector3 Vector3::slerp(const Vector3 &p_to, real_t p_weight) const {
+	// This method seems more complicated than it really is, since we write out
+	// the internals of some methods for efficiency (mainly, checking length).
+	real_t start_length_sq = length_squared();
+	real_t end_length_sq = p_to.length_squared();
+	if (unlikely(start_length_sq == 0.0f || end_length_sq == 0.0f)) {
+		// Zero length vectors have no angle, so the best we can do is either lerp or throw an error.
+		return lerp(p_to, p_weight);
+	}
+	Vector3 axis = cross(p_to);
+	real_t axis_length_sq = axis.length_squared();
+	if (unlikely(axis_length_sq == 0.0f)) {
+		// Colinear vectors have no rotation axis or angle between them, so the best we can do is lerp.
+		return lerp(p_to, p_weight);
+	}
+	axis /= Math::sqrt(axis_length_sq);
+	real_t start_length = Math::sqrt(start_length_sq);
+	real_t result_length = Math::lerp(start_length, Math::sqrt(end_length_sq), p_weight);
+	real_t angle = angle_to(p_to);
+	return rotated(axis, angle * p_weight) * (result_length / start_length);
+} //maybe this could use SIMD and be put in vector3SIMD.h
+
+Vector3 Vector3::cubic_interpolate(const Vector3 &p_b, const Vector3 &p_pre_a, const Vector3 &p_post_b, real_t p_weight) const {
+	Vector3 res = *this;
+	res.x = Math::cubic_interpolate(res.x, p_b.x, p_pre_a.x, p_post_b.x, p_weight);
+	res.y = Math::cubic_interpolate(res.y, p_b.y, p_pre_a.y, p_post_b.y, p_weight);
+	res.z = Math::cubic_interpolate(res.z, p_b.z, p_pre_a.z, p_post_b.z, p_weight);
+	return res;
+}
+
+Vector3 Vector3::cubic_interpolate_in_time(const Vector3 &p_b, const Vector3 &p_pre_a, const Vector3 &p_post_b, real_t p_weight, real_t p_b_t, real_t p_pre_a_t, real_t p_post_b_t) const {
+	Vector3 res = *this;
+	res.x = Math::cubic_interpolate_in_time(res.x, p_b.x, p_pre_a.x, p_post_b.x, p_weight, p_b_t, p_pre_a_t, p_post_b_t);
+	res.y = Math::cubic_interpolate_in_time(res.y, p_b.y, p_pre_a.y, p_post_b.y, p_weight, p_b_t, p_pre_a_t, p_post_b_t);
+	res.z = Math::cubic_interpolate_in_time(res.z, p_b.z, p_pre_a.z, p_post_b.z, p_weight, p_b_t, p_pre_a_t, p_post_b_t);
+	return res;
+}
+
+Vector3 Vector3::bezier_interpolate(const Vector3 &p_control_1, const Vector3 &p_control_2, const Vector3 &p_end, real_t p_t) const {
+	Vector3 res = *this;
+	res.x = Math::bezier_interpolate(res.x, p_control_1.x, p_control_2.x, p_end.x, p_t);
+	res.y = Math::bezier_interpolate(res.y, p_control_1.y, p_control_2.y, p_end.y, p_t);
+	res.z = Math::bezier_interpolate(res.z, p_control_1.z, p_control_2.z, p_end.z, p_t);
+	return res;
+}
+
+Vector3 Vector3::bezier_derivative(const Vector3 &p_control_1, const Vector3 &p_control_2, const Vector3 &p_end, real_t p_t) const {
+	Vector3 res = *this;
+	res.x = Math::bezier_derivative(res.x, p_control_1.x, p_control_2.x, p_end.x, p_t);
+	res.y = Math::bezier_derivative(res.y, p_control_1.y, p_control_2.y, p_end.y, p_t);
+	res.z = Math::bezier_derivative(res.z, p_control_1.z, p_control_2.z, p_end.z, p_t);
+	return res;
+}
+
+
 
 // Operators for comparison
 bool Vector3::operator==(const Vector3 &p_v) const {

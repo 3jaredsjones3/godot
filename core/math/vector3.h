@@ -270,12 +270,8 @@ struct [[nodiscard]] Vector3 {
                                real_t p_t) const;
 
      // Distance calculations
-     inline real_t distance_to(const Vector3& p_to) const {
-          return (p_to - *this).length();
-     }
-     inline real_t distance_squared_to(const Vector3& p_to) const {
-          return (p_to - *this).length_squared();
-     }
+     real_t distance_to(const Vector3& p_to) const;
+     real_t distance_squared_to(const Vector3& p_to) const;
 
      // Modulo operations
      Vector3 posmod(real_t p_mod) const;
