@@ -35,69 +35,15 @@
 #include "core/math/vector3i.h"
 #include "core/string/ustring.h"
 
-// Define the static zero vector
-const Vector3 Vector3::_zero(0.0f, 0.0f, 0.0f);
+#ifdef AVX
+#include <immintrin.h>
+#endif
 
-// Public access method that returns reference to static zero
-const Vector3& Vector3::get_zero_vector() {
-    static const Vector3 zero_vector(0.0f, 0.0f, 0.0f);
-    return zero_vector;
-}
-
-Vector3 Vector3::maxf(real_t p_scalar) const {
-    return Vector3(MAX(x, p_scalar), MAX(y, p_scalar), MAX(z, p_scalar));
-}
-
-Vector3 Vector3::minf(real_t p_scalar) const {
-    return Vector3(MIN(x, p_scalar), MIN(y, p_scalar), MIN(z, p_scalar));
-}
-
-real_t Vector3::scalar_length() const {
-    real_t x2 = x * x;
-    real_t y2 = y * y;
-    real_t z2 = z * z;
-    return Math::sqrt(x2 + y2 + z2);
-}
-
-real_t Vector3::scalar_length_squared() const {
-    real_t x2 = x * x;
-    real_t y2 = y * y;
-    real_t z2 = z * z;
-    return x2 + y2 + z2;
-}
-
-void Vector3::scalar_normalize() {
-    real_t lengthsq = scalar_length_squared();
-    if (lengthsq == 0) {
-        x = y = z = 0;
-    } else {
-        real_t length = Math::sqrt(lengthsq);
-        x /= length;
-        y /= length;
-        z /= length;
-    }
-}
-
-Vector3 Vector3::scalar_normalized() const {
-    Vector3 v = *this;
-    v.scalar_normalize();
-    return v;
-}
-
-bool Vector3::scalar_is_normalized() const {
-    return Math::is_equal_approx(scalar_length_squared(), 1, (real_t)UNIT_EPSILON);
-}
-
-real_t Vector3::scalar_dot(const Vector3 &p_v) const {
-    return x * p_v.x + y * p_v.y + z * p_v.z;
-}
-
-Vector3 Vector3::scalar_cross(const Vector3 &p_v) const {
-    return Vector3(
-        (y * p_v.z) - (z * p_v.y),
-        (z * p_v.x) - (x * p_v.z),
-        (x * p_v.y) - (y * p_v.x)
-    );
+// Constructor
+Vector3::Vector3(real_t p_x, real_t p_y, real_t p_z) {
+    x = p_x;
+    y = p_y;
+    z = p_z;
 }
 
 void Vector3::rotate(const Vector3 &p_axis, real_t p_angle) {
@@ -218,6 +164,158 @@ Basis Vector3::outer(const Vector3 &p_with) const {
     return basis;
 }
 
+Vector3 Vector3::posmod(real_t p_mod) const {
+    return Vector3(
+        Math::fposmod(x, p_mod),
+        Math::fposmod(y, p_mod),
+        Math::fposmod(z, p_mod)
+    );
+}
+
+Vector3 Vector3::posmodv(const Vector3& p_modv) const {
+    return Vector3(
+        Math::fposmod(x, p_modv.x),
+        Math::fposmod(y, p_modv.y),
+        Math::fposmod(z, p_modv.z)
+    );
+}
+
+Vector3 &Vector3::operator*=(const Vector3 &p_v) {
+#ifdef AVX
+    __m128 m = _mm_load_ps(&x);
+    __m128 v = _mm_load_ps(&p_v.x);
+    __m128 res = _mm_mul_ps(m, v);
+    _mm_store_ps(&x, res);
+#else
+    x *= p_v.x;
+    y *= p_v.y;
+    z *= p_v.z;
+#endif
+    return *this;
+}
+
+Vector3 Vector3::operator*(const Vector3 &p_v) const {
+    Vector3 res = *this;
+    res *= p_v;
+    return res;
+}
+
+Vector3 &Vector3::operator*=(real_t p_scalar) {
+    x *= p_scalar;
+    y *= p_scalar;
+    z *= p_scalar;
+    return *this;
+}
+
+Vector3 Vector3::operator*(real_t p_scalar) const {
+    return Vector3(x * p_scalar, y * p_scalar, z * p_scalar);
+}
+
+Vector3 &Vector3::operator/=(real_t p_scalar) {
+    x /= p_scalar;
+    y /= p_scalar;
+    z /= p_scalar;
+    return *this;
+}
+
+Vector3 Vector3::operator/(real_t p_scalar) const {
+    return Vector3(x / p_scalar, y / p_scalar, z / p_scalar);
+}
+
+Vector3 Vector3::cross(const Vector3 &p_with) const {
+    return Vector3(
+        (y * p_with.z) - (z * p_with.y),
+        (z * p_with.x) - (x * p_with.z),
+        (x * p_with.y) - (y * p_with.x)
+    );
+}
+
+real_t Vector3::dot(const Vector3 &p_with) const {
+    return x * p_with.x + y * p_with.y + z * p_with.z;
+}
+
+real_t Vector3::length() const {
+    return Math::sqrt(x * x + y * y + z * z);
+}
+
+real_t Vector3::length_squared() const {
+    return x * x + y * y + z * z;
+}
+
+void Vector3::normalize() {
+    real_t l = length();
+    if (l > 0) {
+        x /= l;
+        y /= l;
+        z /= l;
+    }
+}
+
+Vector3 Vector3::normalized() const {
+    Vector3 v = *this;
+    v.normalize();
+    return v;
+}
+
+bool Vector3::is_normalized() const {
+    return Math::is_equal_approx(length_squared(), (real_t) 1.0);
+}
+
+Vector3 Vector3::abs() const {
+    return Vector3(Math::abs(x), Math::abs(y), Math::abs(z));
+}
+
+Vector3 Vector3::sign() const {
+    return Vector3(SIGN(x), SIGN(y), SIGN(z));
+}
+
+Vector3 Vector3::floor() const {
+    return Vector3(Math::floor(x), Math::floor(y), Math::floor(z));
+}
+
+Vector3 Vector3::ceil() const {
+    return Vector3(Math::ceil(x), Math::ceil(y), Math::ceil(z));
+}
+
+Vector3 Vector3::round() const {
+    return Vector3(Math::round(x), Math::round(y), Math::round(z));
+}
+
+Vector3 Vector3::inverse() const {
+    return Vector3(1.0f / x, 1.0f / y, 1.0f / z);
+}
+
+// Operators for comparison
+bool Vector3::operator==(const Vector3 &p_v) const {
+    return x == p_v.x && y == p_v.y && z == p_v.z;
+}
+
+bool Vector3::operator!=(const Vector3 &p_v) const {
+    return !(*this == p_v);
+}
+
+bool Vector3::operator<(const Vector3 &p_v) const {
+    if (x == p_v.x) {
+        if (y == p_v.y) {
+            return z < p_v.z;
+        }
+        return y < p_v.y;
+    }
+    return x < p_v.x;
+}
+
+bool Vector3::operator<=(const Vector3 &p_v) const {
+    return *this < p_v || *this == p_v;
+}
+
+bool Vector3::operator>(const Vector3 &p_v) const {
+    return !(*this <= p_v);
+}
+
+bool Vector3::operator>=(const Vector3 &p_v) const {
+    return !(*this < p_v);
+}
+
 bool Vector3::is_equal_approx(const Vector3 &p_v) const {
     return Math::is_equal_approx(x, p_v.x) && Math::is_equal_approx(y, p_v.y) && Math::is_equal_approx(z, p_v.z);
 }
@@ -230,6 +328,7 @@ bool Vector3::is_finite() const {
     return Math::is_finite(x) && Math::is_finite(y) && Math::is_finite(z);
 }
 
+// Implicit conversions
 Vector3::operator String() const {
     return "(" + String::num_real(x, true) + ", " + String::num_real(y, true) + ", " + String::num_real(z, true) + ")";
 }

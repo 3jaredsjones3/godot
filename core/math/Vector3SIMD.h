@@ -31,47 +31,36 @@
 #ifndef VECTOR3SIMD_H
 #define VECTOR3SIMD_H
 
-#include <cstdint>
-#include <cassert>
-#include <cstddef>
-#include <cmath>
-
 #include "core/math/math_defs.h"
 #include "core/math/math_funcs.h"
+#include <cmath>
 
 // Architecture detection
-#if defined(__SSE__) || (defined(__x86_64__) && !defined(__EMSCRIPTEN__)) || defined(_M_X64)
+#if defined(__SSE__) || (defined(_M_X64) && !defined(__EMSCRIPTEN__))
     #define VECTOR3SIMD_USE_SSE
-    #include <xmmintrin.h>  // SSE
-    #include <emmintrin.h>  // SSE2
+    #include <xmmintrin.h> // SSE
+    #include <emmintrin.h> // SSE2
     #if defined(__SSE4_1__)
-        #include <smmintrin.h> // SSE4.1 for _mm_dp_ps
+        #include <smmintrin.h> // SSE4.1
     #endif
 #elif defined(__ARM_NEON) || defined(__aarch64__)
     #define VECTOR3SIMD_USE_NEON
     #include <arm_neon.h>
-#else
-    #define VECTOR3SIMD_USE_SCALAR
 #endif
 
 struct Vector3; // Forward declaration
 
 struct alignas(16) Vector3SIMD {
+    union {
 #if defined(VECTOR3SIMD_USE_SSE)
-    union {
         __m128 m_value;
-        float f[4];
-    };
 #elif defined(VECTOR3SIMD_USE_NEON)
-    union {
         float32x4_t m_value;
+#endif
         float f[4];
     };
-#else
-    float f[4];
-#endif
 
-    // Default constructor
+    // Basic constructors
     inline Vector3SIMD() {
 #if defined(VECTOR3SIMD_USE_SSE)
         m_value = _mm_setzero_ps();
@@ -82,7 +71,6 @@ struct alignas(16) Vector3SIMD {
 #endif
     }
 
-    // Construct from components
     inline Vector3SIMD(float p_x, float p_y, float p_z) {
 #if defined(VECTOR3SIMD_USE_SSE)
         m_value = _mm_set_ps(0.0f, p_z, p_y, p_x);
@@ -97,17 +85,9 @@ struct alignas(16) Vector3SIMD {
 #endif
     }
 
-    // Construct from Vector3 (declared but not defined here)
-    inline explicit Vector3SIMD(const Vector3 &p_v); 
-
-    // Conversion to Vector3 (declared but not defined here)
-    inline operator Vector3() const;
-
-#if defined(VECTOR3SIMD_USE_SSE)
-    inline Vector3SIMD(__m128 val) : m_value(val) {}
-#elif defined(VECTOR3SIMD_USE_NEON)
-    inline Vector3SIMD(float32x4_t val) : m_value(val) {}
-#endif
+    // Vector3 conversion constructors (defined after Vector3 struct)
+    explicit Vector3SIMD(const Vector3& p_v);
+    operator Vector3() const;
 
     // Component access
     inline float x() const { return f[0]; }
@@ -116,48 +96,87 @@ struct alignas(16) Vector3SIMD {
     inline float w() const { return f[3]; }
 
     // Basic arithmetic operations
-    inline Vector3SIMD operator+(const Vector3SIMD &p_v) const {
+    inline Vector3SIMD operator+(const Vector3SIMD& p_v) const {
+        Vector3SIMD ret;
 #if defined(VECTOR3SIMD_USE_SSE)
-        return Vector3SIMD(_mm_add_ps(m_value, p_v.m_value));
+        ret.m_value = _mm_add_ps(m_value, p_v.m_value);
 #elif defined(VECTOR3SIMD_USE_NEON)
-        return Vector3SIMD(vaddq_f32(m_value, p_v.m_value));
+        ret.m_value = vaddq_f32(m_value, p_v.m_value);
 #else
-        return Vector3SIMD(f[0] + p_v.f[0], f[1] + p_v.f[1], f[2] + p_v.f[2]);
+        ret.f[0] = f[0] + p_v.f[0];
+        ret.f[1] = f[1] + p_v.f[1];
+        ret.f[2] = f[2] + p_v.f[2];
+        ret.f[3] = 0.0f;
 #endif
+        return ret;
     }
 
-    inline Vector3SIMD operator-(const Vector3SIMD &p_v) const {
+    inline Vector3SIMD operator-(const Vector3SIMD& p_v) const {
+        Vector3SIMD ret;
 #if defined(VECTOR3SIMD_USE_SSE)
-        return Vector3SIMD(_mm_sub_ps(m_value, p_v.m_value));
+        ret.m_value = _mm_sub_ps(m_value, p_v.m_value);
 #elif defined(VECTOR3SIMD_USE_NEON)
-        return Vector3SIMD(vsubq_f32(m_value, p_v.m_value));
+        ret.m_value = vsubq_f32(m_value, p_v.m_value);
 #else
-        return Vector3SIMD(f[0] - p_v.f[0], f[1] - p_v.f[1], f[2] - p_v.f[2]);
+        ret.f[0] = f[0] - p_v.f[0];
+        ret.f[1] = f[1] - p_v.f[1];
+        ret.f[2] = f[2] - p_v.f[2];
+        ret.f[3] = 0.0f;
 #endif
+        return ret;
     }
 
-    inline Vector3SIMD operator*(float scalar) const {
+    inline Vector3SIMD operator*(const Vector3SIMD& p_v) const {
+        Vector3SIMD ret;
 #if defined(VECTOR3SIMD_USE_SSE)
-        return Vector3SIMD(_mm_mul_ps(m_value, _mm_set1_ps(scalar)));
+        ret.m_value = _mm_mul_ps(m_value, p_v.m_value);
 #elif defined(VECTOR3SIMD_USE_NEON)
-        return Vector3SIMD(vmulq_n_f32(m_value, scalar));
+        ret.m_value = vmulq_f32(m_value, p_v.m_value);
 #else
-        return Vector3SIMD(f[0] * scalar, f[1] * scalar, f[2] * scalar);
+        ret.f[0] = f[0] * p_v.f[0];
+        ret.f[1] = f[1] * p_v.f[1];
+        ret.f[2] = f[2] * p_v.f[2];
+        ret.f[3] = 0.0f;
 #endif
+        return ret;
     }
 
-    inline Vector3SIMD operator/(float scalar) const {
-        float inv = 1.0f / scalar;
+    inline Vector3SIMD operator*(float p_scalar) const {
+        Vector3SIMD ret;
 #if defined(VECTOR3SIMD_USE_SSE)
-        return Vector3SIMD(_mm_mul_ps(m_value, _mm_set1_ps(inv)));
+        ret.m_value = _mm_mul_ps(m_value, _mm_set1_ps(p_scalar));
 #elif defined(VECTOR3SIMD_USE_NEON)
-        return Vector3SIMD(vmulq_n_f32(m_value, inv));
+        ret.m_value = vmulq_n_f32(m_value, p_scalar);
 #else
-        return Vector3SIMD(f[0] * inv, f[1] * inv, f[2] * inv);
+        ret.f[0] = f[0] * p_scalar;
+        ret.f[1] = f[1] * p_scalar;
+        ret.f[2] = f[2] * p_scalar;
+        ret.f[3] = 0.0f;
 #endif
+        return ret;
     }
 
-    inline Vector3SIMD &operator+=(const Vector3SIMD &p_v) {
+    inline Vector3SIMD operator/(const Vector3SIMD& p_v) const {
+        Vector3SIMD ret;
+#if defined(VECTOR3SIMD_USE_SSE)
+        ret.m_value = _mm_div_ps(m_value, p_v.m_value);
+#elif defined(VECTOR3SIMD_USE_NEON)
+        ret.m_value = vdivq_f32(m_value, p_v.m_value);
+#else
+        ret.f[0] = f[0] / p_v.f[0];
+        ret.f[1] = f[1] / p_v.f[1];
+        ret.f[2] = f[2] / p_v.f[2];
+        ret.f[3] = 0.0f;
+#endif
+        return ret;
+    }
+
+    inline Vector3SIMD operator/(float p_scalar) const {
+        return *this * (1.0f / p_scalar);
+    }
+
+    // Compound assignment operators
+    inline Vector3SIMD& operator+=(const Vector3SIMD& p_v) {
 #if defined(VECTOR3SIMD_USE_SSE)
         m_value = _mm_add_ps(m_value, p_v.m_value);
 #elif defined(VECTOR3SIMD_USE_NEON)
@@ -170,7 +189,7 @@ struct alignas(16) Vector3SIMD {
         return *this;
     }
 
-    inline Vector3SIMD &operator-=(const Vector3SIMD &p_v) {
+    inline Vector3SIMD& operator-=(const Vector3SIMD& p_v) {
 #if defined(VECTOR3SIMD_USE_SSE)
         m_value = _mm_sub_ps(m_value, p_v.m_value);
 #elif defined(VECTOR3SIMD_USE_NEON)
@@ -183,7 +202,37 @@ struct alignas(16) Vector3SIMD {
         return *this;
     }
 
-    // Length operations
+    inline Vector3SIMD& operator*=(const Vector3SIMD& p_v) {
+#if defined(VECTOR3SIMD_USE_SSE)
+        m_value = _mm_mul_ps(m_value, p_v.m_value);
+#elif defined(VECTOR3SIMD_USE_NEON)
+        m_value = vmulq_f32(m_value, p_v.m_value);
+#else
+        f[0] *= p_v.f[0];
+        f[1] *= p_v.f[1];
+        f[2] *= p_v.f[2];
+#endif
+        return *this;
+    }
+
+    inline Vector3SIMD& operator*=(float p_scalar) {
+#if defined(VECTOR3SIMD_USE_SSE)
+        m_value = _mm_mul_ps(m_value, _mm_set1_ps(p_scalar));
+#elif defined(VECTOR3SIMD_USE_NEON)
+        m_value = vmulq_n_f32(m_value, p_scalar);
+#else
+        f[0] *= p_scalar;
+        f[1] *= p_scalar;
+        f[2] *= p_scalar;
+#endif
+        return *this;
+    }
+
+    inline Vector3SIMD& operator/=(float p_scalar) {
+        return *this *= (1.0f / p_scalar);
+    }
+
+    // Utility functions
     inline float length_squared() const {
 #if defined(VECTOR3SIMD_USE_SSE)
     #if defined(__SSE4_1__)
@@ -204,77 +253,19 @@ struct alignas(16) Vector3SIMD {
 #endif
     }
 
-    // Min/Max operations
-    inline Vector3SIMD min(const Vector3SIMD &p_v) const {
-    #if defined(VECTOR3SIMD_USE_SSE)
-        return Vector3SIMD(_mm_min_ps(m_value, p_v.m_value));
-    #elif defined(VECTOR3SIMD_USE_NEON)
-        return Vector3SIMD(vminq_f32(m_value, p_v.m_value));
-    #else
-        return Vector3SIMD(
-            MIN(f[0], p_v.f[0]),
-            MIN(f[1], p_v.f[1]),
-            MIN(f[2], p_v.f[2])
-        );
-    #endif
-    }
-
-    inline Vector3SIMD minf(float p_scalar) const {
-    #if defined(VECTOR3SIMD_USE_SSE)
-        return Vector3SIMD(_mm_min_ps(m_value, _mm_set1_ps(p_scalar)));
-    #elif defined(VECTOR3SIMD_USE_NEON)
-        return Vector3SIMD(vminq_f32(m_value, vdupq_n_f32(p_scalar)));
-    #else
-        return Vector3SIMD(
-            MIN(f[0], p_scalar),
-            MIN(f[1], p_scalar),
-            MIN(f[2], p_scalar)
-        );
-    #endif
-    }
-
-    inline Vector3SIMD max(const Vector3SIMD &p_v) const {
-    #if defined(VECTOR3SIMD_USE_SSE)
-        return Vector3SIMD(_mm_max_ps(m_value, p_v.m_value));
-    #elif defined(VECTOR3SIMD_USE_NEON)
-        return Vector3SIMD(vmaxq_f32(m_value, p_v.m_value));
-    #else
-        return Vector3SIMD(
-            MAX(f[0], p_v.f[0]),
-            MAX(f[1], p_v.f[1]),
-            MAX(f[2], p_v.f[2])
-        );
-    #endif
-    }
-
-    inline Vector3SIMD maxf(float p_scalar) const {
-    #if defined(VECTOR3SIMD_USE_SSE)
-        return Vector3SIMD(_mm_max_ps(m_value, _mm_set1_ps(p_scalar)));
-    #elif defined(VECTOR3SIMD_USE_NEON)
-        return Vector3SIMD(vmaxq_f32(m_value, vdupq_n_f32(p_scalar)));
-    #else
-        return Vector3SIMD(
-            MAX(f[0], p_scalar),
-            MAX(f[1], p_scalar),
-            MAX(f[2], p_scalar)
-        );
-    #endif
-    }
-
     inline float length() const {
         return Math::sqrt(length_squared());
     }
 
     inline Vector3SIMD normalized() const {
-        float len = length();
-        if (len == 0) {
+        float l = length();
+        if (l == 0) {
             return Vector3SIMD();
         }
-        return *this / len;
+        return *this * (1.0f / l);
     }
 
-    // Dot product
-    inline float dot(const Vector3SIMD &p_v) const {
+    inline float dot(const Vector3SIMD& p_v) const {
 #if defined(VECTOR3SIMD_USE_SSE)
     #if defined(__SSE4_1__)
         return _mm_cvtss_f32(_mm_dp_ps(m_value, p_v.m_value, 0x7F));
@@ -294,8 +285,7 @@ struct alignas(16) Vector3SIMD {
 #endif
     }
 
-    // Cross product
-    inline Vector3SIMD cross(const Vector3SIMD &p_v) const {
+    inline Vector3SIMD cross(const Vector3SIMD& p_v) const {
 #if defined(VECTOR3SIMD_USE_SSE)
         __m128 a = m_value;
         __m128 b = p_v.m_value;
@@ -305,7 +295,10 @@ struct alignas(16) Vector3SIMD {
             _mm_mul_ps(a, b_yzx),
             _mm_mul_ps(a_yzx, b)
         );
-        return Vector3SIMD(_mm_shuffle_ps(c, c, _MM_SHUFFLE(3, 0, 2, 1)));
+
+        Vector3SIMD ret;
+        ret.m_value = _mm_shuffle_ps(c, c, _MM_SHUFFLE(3, 0, 2, 1));
+        return ret;
 #elif defined(VECTOR3SIMD_USE_NEON)
         float32x4_t a_yzx = vextq_f32(m_value, m_value, 1);
         float32x4_t b_yzx = vextq_f32(p_v.m_value, p_v.m_value, 1);
@@ -313,12 +306,71 @@ struct alignas(16) Vector3SIMD {
             vmulq_f32(m_value, b_yzx),
             vmulq_f32(a_yzx, p_v.m_value)
         );
-        return Vector3SIMD(vextq_f32(c, c, 3));
+        Vector3SIMD ret;
+        ret.m_value = vextq_f32(c, c, 3);
+        return ret;
 #else
         return Vector3SIMD(
             f[1] * p_v.f[2] - f[2] * p_v.f[1],
             f[2] * p_v.f[0] - f[0] * p_v.f[2],
             f[0] * p_v.f[1] - f[1] * p_v.f[0]
+        );
+#endif
+    }
+
+    // Min/Max operations
+    inline Vector3SIMD min(const Vector3SIMD& p_v) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+        return Vector3SIMD(_mm_min_ps(m_value, p_v.m_value));
+#elif defined(VECTOR3SIMD_USE_NEON)
+        return Vector3SIMD(vminq_f32(m_value, p_v.m_value));
+#else
+        return Vector3SIMD(
+            MIN(f[0], p_v.f[0]),
+            MIN(f[1], p_v.f[1]),
+            MIN(f[2], p_v.f[2])
+        );
+#endif
+    }
+
+    inline Vector3SIMD max(const Vector3SIMD& p_v) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+        return Vector3SIMD(_mm_max_ps(m_value, p_v.m_value));
+#elif defined(VECTOR3SIMD_USE_NEON)
+        return Vector3SIMD(vmaxq_f32(m_value, p_v.m_value));
+#else
+        return Vector3SIMD(
+            MAX(f[0], p_v.f[0]),
+            MAX(f[1], p_v.f[1]),
+            MAX(f[2], p_v.f[2])
+        );
+#endif
+    }
+
+    inline Vector3SIMD minf(float p_scalar) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+        return Vector3SIMD(_mm_min_ps(m_value, _mm_set1_ps(p_scalar)));
+#elif defined(VECTOR3SIMD_USE_NEON)
+        return Vector3SIMD(vminq_f32(m_value, vdupq_n_f32(p_scalar)));
+#else
+        return Vector3SIMD(
+            MIN(f[0], p_scalar),
+            MIN(f[1], p_scalar),
+            MIN(f[2], p_scalar)
+        );
+#endif
+    }
+
+    inline Vector3SIMD maxf(float p_scalar) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+        return Vector3SIMD(_mm_max_ps(m_value, _mm_set1_ps(p_scalar)));
+#elif defined(VECTOR3SIMD_USE_NEON)
+        return Vector3SIMD(vmaxq_f32(m_value, vdupq_n_f32(p_scalar)));
+#else
+        return Vector3SIMD(
+            MAX(f[0], p_scalar),
+            MAX(f[1], p_scalar),
+            MAX(f[2], p_scalar)
         );
 #endif
     }
@@ -335,6 +387,12 @@ struct alignas(16) Vector3SIMD {
     inline bool has_error() const {
         return has_nan() || has_inf();
     }
+
+#if defined(VECTOR3SIMD_USE_SSE)
+    inline Vector3SIMD(__m128 p_value) : m_value(p_value) {}
+#elif defined(VECTOR3SIMD_USE_NEON)
+    inline Vector3SIMD(float32x4_t p_value) : m_value(p_value) {}
+#endif
 };
 
 #endif // VECTOR3SIMD_H
