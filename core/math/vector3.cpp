@@ -29,31 +29,66 @@
 /**************************************************************************/
 
 #include "vector3.h"
-
 #include "core/math/basis.h"
 #include "core/math/vector2.h"
 #include "core/math/vector3i.h"
 #include "core/string/ustring.h"
+#include "core/math/math_funcs.h"
 
-#ifdef AVX
-#include <immintrin.h>
-#endif
+/***************************************************/
+/* Fallback methods for when SIMD is unavailable or */
+/* fails, as referenced by vector3.h                */
+/***************************************************/
 
-// Constructor
-Vector3::Vector3(real_t p_x, real_t p_y, real_t p_z) {
-    x = p_x;
-    y = p_y;
-    z = p_z;
+real_t Vector3::dot_fallback(const Vector3 &p_with) const {
+    return x * p_with.x + y * p_with.y + z * p_with.z;
+}
+
+Vector3 Vector3::cross_fallback(const Vector3 &p_with) const {
+    return Vector3(
+        (y * p_with.z) - (z * p_with.y),
+        (z * p_with.x) - (x * p_with.z),
+        (x * p_with.y) - (y * p_with.x)
+    );
+}
+
+real_t Vector3::length_fallback() const {
+    return Math::sqrt(x * x + y * y + z * z);
+}
+
+real_t Vector3::length_squared_fallback() const {
+    return x * x + y * y + z * z;
+}
+
+Vector3 Vector3::min_fallback(const Vector3 &p_vec3) const {
+    return Vector3(MIN(x, p_vec3.x), MIN(y, p_vec3.y), MIN(z, p_vec3.z));
+}
+
+Vector3 Vector3::max_fallback(const Vector3 &p_vec3) const {
+    return Vector3(MAX(x, p_vec3.x), MAX(y, p_vec3.y), MAX(z, p_vec3.z));
+}
+
+Vector3 Vector3::minf_fallback(real_t p_scalar) const {
+    return Vector3(MIN(x, p_scalar), MIN(y, p_scalar), MIN(z, p_scalar));
+}
+
+Vector3 Vector3::maxf_fallback(real_t p_scalar) const {
+    return Vector3(MAX(x, p_scalar), MAX(y, p_scalar), MAX(z, p_scalar));
 }
 
 // Distance calculations
-real_t Vector3::distance_to(const Vector3 &p_to) const {
+real_t Vector3::distance_to_fallback(const Vector3 &p_to) const {
 	return (p_to - *this).length();
 }
 
-real_t Vector3::distance_squared_to(const Vector3 &p_to) const {
-	return (p_to - *this).length_squared();
+real_t Vector3::distance_squared_to_fallback(const Vector3 &p_to) const {
+	return (p_to - *this).length_squared_fallback();
 }
+
+/***************************************************/
+/* Original fallback (scalar-only) implementations  */
+/***************************************************/
+
 
 void Vector3::rotate(const Vector3 &p_axis, real_t p_angle) {
     *this = Basis(p_axis, p_angle).xform(*this);
@@ -106,7 +141,7 @@ Vector3 Vector3::snappedf(real_t p_step) const {
 }
 
 Vector3 Vector3::limit_length(real_t p_len) const {
-    const real_t l = length();
+    const real_t l = length_fallback();
     Vector3 v = *this;
     if (l > 0 && p_len < l) {
         v /= l;
@@ -118,7 +153,7 @@ Vector3 Vector3::limit_length(real_t p_len) const {
 Vector3 Vector3::move_toward(const Vector3 &p_to, real_t p_delta) const {
     Vector3 v = *this;
     Vector3 vd = p_to - v;
-    real_t len = vd.length();
+    real_t len = vd.length_fallback();
     return len <= p_delta || len < (real_t)CMP_EPSILON ? p_to : v + vd / len * p_delta;
 }
 
@@ -181,7 +216,7 @@ Vector3 Vector3::posmod(real_t p_mod) const {
     );
 }
 
-Vector3 Vector3::posmodv(const Vector3& p_modv) const {
+Vector3 Vector3::posmodv(const Vector3 &p_modv) const {
     return Vector3(
         Math::fposmod(x, p_modv.x),
         Math::fposmod(y, p_modv.y),
@@ -190,16 +225,9 @@ Vector3 Vector3::posmodv(const Vector3& p_modv) const {
 }
 
 Vector3 &Vector3::operator*=(const Vector3 &p_v) {
-#ifdef AVX
-    __m128 m = _mm_load_ps(&x);
-    __m128 v = _mm_load_ps(&p_v.x);
-    __m128 res = _mm_mul_ps(m, v);
-    _mm_store_ps(&x, res);
-#else
     x *= p_v.x;
     y *= p_v.y;
     z *= p_v.z;
-#endif
     return *this;
 }
 
@@ -239,28 +267,16 @@ Vector3 Vector3::cross(const Vector3 &p_with) const {
     );
 }
 
-real_t Vector3::dot(const Vector3 &p_with) const {
-    return x * p_with.x + y * p_with.y + z * p_with.z;
-}
-
-real_t Vector3::length() const {
-    return Math::sqrt(x * x + y * y + z * z);
-}
-
-real_t Vector3::length_squared() const {
-    return x * x + y * y + z * z;
-}
-
 void Vector3::normalize() {
-	real_t lengthsq = length_squared();
-	if (lengthsq == 0) {
-		x = y = z = 0;
-	} else {
-		real_t length = Math::sqrt(lengthsq);
-		x /= length;
-		y /= length;
-		z /= length;
-	}
+    real_t lengthsq = length_squared_fallback();
+    if (lengthsq == 0) {
+        x = y = z = 0;
+    } else {
+        real_t length = Math::sqrt(lengthsq);
+        x /= length;
+        y /= length;
+        z /= length;
+    }
 }
 
 Vector3 Vector3::normalized() const {
@@ -270,7 +286,7 @@ Vector3 Vector3::normalized() const {
 }
 
 bool Vector3::is_normalized() const {
-    return Math::is_equal_approx(length_squared(), (real_t) 1.0);
+    return Math::is_equal_approx(length_squared_fallback(), (real_t) 1.0);
 }
 
 Vector3 Vector3::abs() const {
@@ -297,115 +313,113 @@ Vector3 Vector3::inverse() const {
     return Vector3(1.0f / x, 1.0f / y, 1.0f / z);
 }
 
-Vector3 Vector3::project(const Vector3 &p_to) const {
-	return p_to * (dot(p_to) / p_to.length_squared());
-} //maybe this could use SIMD and be put in vector3SIMD.h
+Vector3 Vector3::project_fallback(const Vector3 &p_to) const {
+    return p_to * (dot(p_to) / p_to.length_squared_fallback());
+} 
 
-real_t Vector3::angle_to(const Vector3 &p_to) const {
-	return Math::atan2(cross(p_to).length(), dot(p_to));
-} //maybe this could use SIMD and be put in vector3SIMD.h
+real_t Vector3::angle_to_fallback(const Vector3 &p_to) const {
+    Vector3 c = cross(p_to);
+    return Math::atan2(c.length(), dot(p_to));
+} 
 
-real_t Vector3::signed_angle_to(const Vector3 &p_to, const Vector3 &p_axis) const {
-	Vector3 cross_to = cross(p_to);
-	real_t unsigned_angle = Math::atan2(cross_to.length(), dot(p_to));
-	real_t sign = cross_to.dot(p_axis);
-	return (sign < 0) ? -unsigned_angle : unsigned_angle;
-} //maybe this could use SIMD and be put in vector3SIMD.h
+real_t Vector3::signed_angle_to_fallback(const Vector3 &p_to, const Vector3 &p_axis) const {
+    Vector3 cross_to = cross(p_to);
+    real_t unsigned_angle = Math::atan2(cross_to.length(), dot(p_to));
+    real_t sign = cross_to.dot(p_axis);
+    return (sign < 0) ? -unsigned_angle : unsigned_angle;
+} 
 
-Vector3 Vector3::direction_to(const Vector3 &p_to) const {
-	Vector3 ret(p_to.x - x, p_to.y - y, p_to.z - z);
-	ret.normalize();
-	return ret;
-} //maybe this could use SIMD and be put in vector3SIMD.h
-
-// slide returns the component of the vector along the given plane, specified by its normal vector.
-Vector3 Vector3::slide(const Vector3 &p_normal) const {
-#ifdef MATH_CHECKS
-	ERR_FAIL_COND_V_MSG(!p_normal.is_normalized(), Vector3(), "The normal Vector3 " + p_normal.operator String() + " must be normalized.");
-    // perhaps we could just normalize the vector for them if they do not have it normalized already
-    // we could just output a message about how the operation would proceed faster if they already had it normalized (important if the operation is called many times with the same normal)
-#endif
-	return *this - p_normal * dot(p_normal);
-} //maybe this could use SIMD and be put in vector3SIMD.h
-
-Vector3 Vector3::bounce(const Vector3 &p_normal) const {
-	return -reflect(p_normal);
+Vector3 Vector3::direction_to_fallback(const Vector3 &p_to) const {
+    Vector3 ret(p_to.x - x, p_to.y - y, p_to.z - z);
+    ret.normalize();
+    return ret;
 }
 
-Vector3 Vector3::reflect(const Vector3 &p_normal) const {
+// slide returns the component of the vector along the given plane, specified by its normal vector.
+Vector3 Vector3::slide_fallback(const Vector3 &p_normal) const {
+#ifdef MATH_CHECKS
+    ERR_FAIL_COND_V_MSG(!p_normal.is_normalized(), Vector3(), "The normal Vector3 " + p_normal.operator String() + " must be normalized.");
+    // perhaps we could just normalize the vector for them if they do not have it normalized already
+    // we could just output a message about how the operation would proceed faster if they already had it normalized (important if the operation is called many times with the same normal)
+#endif
+    return *this - p_normal * dot(p_normal);
+}
+
+Vector3 Vector3::bounce(const Vector3 &p_normal) const {
+    return -reflect(p_normal);
+}
+
+Vector3 Vector3::reflect_fallback(const Vector3 &p_normal) const {
 #ifdef MATH_CHECKS
 	ERR_FAIL_COND_V_MSG(!p_normal.is_normalized(), Vector3(), "The normal Vector3 " + p_normal.operator String() + " must be normalized.");
     // perhaps we could just normalize the vector for them if they do not have it normalized already
     // we could just output a message about how the operation would proceed faster if they already had it normalized (important if the operation is called many times with the same normal)
 #endif
-	return 2.0f * p_normal * dot(p_normal) - *this;
-} //maybe this could use SIMD and be put in vector3SIMD.h
+    return 2.0f * p_normal * dot(p_normal) - *this;
+}
 
 Vector3 Vector3::lerp(const Vector3 &p_to, real_t p_weight) const {
-	Vector3 res = *this;
-	res.x = Math::lerp(res.x, p_to.x, p_weight);
-	res.y = Math::lerp(res.y, p_to.y, p_weight);
-	res.z = Math::lerp(res.z, p_to.z, p_weight);
-	return res;
-} //I'm not sure if SIMD could be used here... but maybe?
+    Vector3 res = *this;
+    res.x = Math::lerp(res.x, p_to.x, p_weight);
+    res.y = Math::lerp(res.y, p_to.y, p_weight);
+    res.z = Math::lerp(res.z, p_to.z, p_weight);
+    return res;
+}//I'm not sure if SIMD could be used here... but maybe?
 
-Vector3 Vector3::slerp(const Vector3 &p_to, real_t p_weight) const {
-	// This method seems more complicated than it really is, since we write out
+Vector3 Vector3::slerp_fallback(const Vector3 &p_to, real_t p_weight) const {
+    // This method seems more complicated than it really is, since we write out
 	// the internals of some methods for efficiency (mainly, checking length).
-	real_t start_length_sq = length_squared();
-	real_t end_length_sq = p_to.length_squared();
-	if (unlikely(start_length_sq == 0.0f || end_length_sq == 0.0f)) {
-		// Zero length vectors have no angle, so the best we can do is either lerp or throw an error.
-		return lerp(p_to, p_weight);
-	}
-	Vector3 axis = cross(p_to);
-	real_t axis_length_sq = axis.length_squared();
-	if (unlikely(axis_length_sq == 0.0f)) {
-		// Colinear vectors have no rotation axis or angle between them, so the best we can do is lerp.
-		return lerp(p_to, p_weight);
-	}
-	axis /= Math::sqrt(axis_length_sq);
-	real_t start_length = Math::sqrt(start_length_sq);
-	real_t result_length = Math::lerp(start_length, Math::sqrt(end_length_sq), p_weight);
-	real_t angle = angle_to(p_to);
-	return rotated(axis, angle * p_weight) * (result_length / start_length);
-} //maybe this could use SIMD and be put in vector3SIMD.h
+    real_t start_length_sq = length_squared_fallback();
+    real_t end_length_sq = p_to.length_squared_fallback();
+    if (unlikely(start_length_sq == 0.0f || end_length_sq == 0.0f)) {
+        // Zero length vectors have no angle, so the best we can do is either lerp or throw an error.
+        return lerp(p_to, p_weight);
+    }
+    Vector3 axis = cross(p_to);
+    real_t axis_length_sq = axis.length_squared_fallback();
+    if (unlikely(axis_length_sq == 0.0f)) {
+        // Colinear vectors have no rotation axis or angle between them, so the best we can do is lerp.
+        return lerp(p_to, p_weight);
+    }
+    axis /= Math::sqrt(axis_length_sq);
+    real_t start_length = Math::sqrt(start_length_sq);
+    real_t result_length = Math::lerp(start_length, Math::sqrt(end_length_sq), p_weight);
+    real_t angle = angle_to(p_to);
+    return rotated(axis, angle * p_weight) * (result_length / start_length);
+}//maybe this could use SIMD and be put in vector3SIMD.h
 
 Vector3 Vector3::cubic_interpolate(const Vector3 &p_b, const Vector3 &p_pre_a, const Vector3 &p_post_b, real_t p_weight) const {
-	Vector3 res = *this;
-	res.x = Math::cubic_interpolate(res.x, p_b.x, p_pre_a.x, p_post_b.x, p_weight);
-	res.y = Math::cubic_interpolate(res.y, p_b.y, p_pre_a.y, p_post_b.y, p_weight);
-	res.z = Math::cubic_interpolate(res.z, p_b.z, p_pre_a.z, p_post_b.z, p_weight);
-	return res;
+    Vector3 res = *this;
+    res.x = Math::cubic_interpolate(res.x, p_b.x, p_pre_a.x, p_post_b.x, p_weight);
+    res.y = Math::cubic_interpolate(res.y, p_b.y, p_pre_a.y, p_post_b.y, p_weight);
+    res.z = Math::cubic_interpolate(res.z, p_b.z, p_pre_a.z, p_post_b.z, p_weight);
+    return res;
 }
 
 Vector3 Vector3::cubic_interpolate_in_time(const Vector3 &p_b, const Vector3 &p_pre_a, const Vector3 &p_post_b, real_t p_weight, real_t p_b_t, real_t p_pre_a_t, real_t p_post_b_t) const {
-	Vector3 res = *this;
-	res.x = Math::cubic_interpolate_in_time(res.x, p_b.x, p_pre_a.x, p_post_b.x, p_weight, p_b_t, p_pre_a_t, p_post_b_t);
-	res.y = Math::cubic_interpolate_in_time(res.y, p_b.y, p_pre_a.y, p_post_b.y, p_weight, p_b_t, p_pre_a_t, p_post_b_t);
-	res.z = Math::cubic_interpolate_in_time(res.z, p_b.z, p_pre_a.z, p_post_b.z, p_weight, p_b_t, p_pre_a_t, p_post_b_t);
-	return res;
+    Vector3 res = *this;
+    res.x = Math::cubic_interpolate_in_time(res.x, p_b.x, p_pre_a.x, p_post_b.x, p_weight, p_b_t, p_pre_a_t, p_post_b_t);
+    res.y = Math::cubic_interpolate_in_time(res.y, p_b.y, p_pre_a.y, p_post_b.y, p_weight, p_b_t, p_pre_a_t, p_post_b_t);
+    res.z = Math::cubic_interpolate_in_time(res.z, p_b.z, p_pre_a.z, p_post_b.z, p_weight, p_b_t, p_pre_a_t, p_post_b_t);
+    return res;
 }
 
 Vector3 Vector3::bezier_interpolate(const Vector3 &p_control_1, const Vector3 &p_control_2, const Vector3 &p_end, real_t p_t) const {
-	Vector3 res = *this;
-	res.x = Math::bezier_interpolate(res.x, p_control_1.x, p_control_2.x, p_end.x, p_t);
-	res.y = Math::bezier_interpolate(res.y, p_control_1.y, p_control_2.y, p_end.y, p_t);
-	res.z = Math::bezier_interpolate(res.z, p_control_1.z, p_control_2.z, p_end.z, p_t);
-	return res;
+    Vector3 res = *this;
+    res.x = Math::bezier_interpolate(res.x, p_control_1.x, p_control_2.x, p_end.x, p_t);
+    res.y = Math::bezier_interpolate(res.y, p_control_1.y, p_control_2.y, p_end.y, p_t);
+    res.z = Math::bezier_interpolate(res.z, p_control_1.z, p_control_2.z, p_end.z, p_t);
+    return res;
 }
 
 Vector3 Vector3::bezier_derivative(const Vector3 &p_control_1, const Vector3 &p_control_2, const Vector3 &p_end, real_t p_t) const {
-	Vector3 res = *this;
-	res.x = Math::bezier_derivative(res.x, p_control_1.x, p_control_2.x, p_end.x, p_t);
-	res.y = Math::bezier_derivative(res.y, p_control_1.y, p_control_2.y, p_end.y, p_t);
-	res.z = Math::bezier_derivative(res.z, p_control_1.z, p_control_2.z, p_end.z, p_t);
-	return res;
+    Vector3 res = *this;
+    res.x = Math::bezier_derivative(res.x, p_control_1.x, p_control_2.x, p_end.x, p_t);
+    res.y = Math::bezier_derivative(res.y, p_control_1.y, p_control_2.y, p_end.y, p_t);
+    res.z = Math::bezier_derivative(res.z, p_control_1.z, p_control_2.z, p_end.z, p_t);
+    return res;
 }
 
-
-
-// Operators for comparison
 bool Vector3::operator==(const Vector3 &p_v) const {
     return x == p_v.x && y == p_v.y && z == p_v.z;
 }
@@ -433,7 +447,7 @@ bool Vector3::operator>(const Vector3 &p_v) const {
 }
 
 bool Vector3::operator>=(const Vector3 &p_v) const {
-    return !(*this < p_v);
+    return *this > p_v || *this == p_v;
 }
 
 bool Vector3::is_equal_approx(const Vector3 &p_v) const {
@@ -448,7 +462,6 @@ bool Vector3::is_finite() const {
     return Math::is_finite(x) && Math::is_finite(y) && Math::is_finite(z);
 }
 
-// Implicit conversions
 Vector3::operator String() const {
     return "(" + String::num_real(x, true) + ", " + String::num_real(y, true) + ", " + String::num_real(z, true) + ")";
 }
