@@ -602,6 +602,18 @@ struct alignas(16) Vector3SIMD {
      /* Component-wise Ops - SSE     */
      /********************************/
 #if defined(VECTOR3SIMD_USE_SSE)
+
+_FORCE_INLINE_ Vector3SIMD inverse_sse() const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    __m128 zero = _mm_setzero_ps();
+    __m128 is_zero = _mm_cmpeq_ps(m_value, zero);
+    __m128 one = _mm_set1_ps(1.0f);
+    __m128 inv = _mm_div_ps(one, m_value);
+    return Vector3SIMD(_mm_andnot_ps(is_zero, inv));
+#else
+    return *this;
+#endif
+}
      _FORCE_INLINE_ Vector3SIMD posmod_sse(float p_mod) const {
           __m128 mod = _mm_set1_ps(p_mod);
           __m128 div = _mm_div_ps(m_value, mod);
@@ -649,12 +661,6 @@ struct alignas(16) Vector3SIMD {
      _FORCE_INLINE_ Vector3SIMD maxf_sse(real_t p_scalar) const {
           __m128 scalar = load_scalar_sse(p_scalar);
           return Vector3SIMD(_mm_max_ps(m_value, scalar));
-     }
-
-     _FORCE_INLINE_ Vector3SIMD slide_sse(const Vector3SIMD &p_normal) const {
-          __m128 dot = _mm_dp_ps(m_value, p_normal.m_value, 0x7F);
-          __m128 scaled = _mm_mul_ps(p_normal.m_value, dot);
-          return Vector3SIMD(_mm_sub_ps(m_value, scaled));
      }
 
      _FORCE_INLINE_ Vector3SIMD slerp_sse(const Vector3SIMD &p_to,
@@ -722,6 +728,19 @@ struct alignas(16) Vector3SIMD {
      /* Component-wise Ops - NEON    */
      /********************************/
 #if defined(VECTOR3SIMD_USE_NEON)
+
+_FORCE_INLINE_ Vector3SIMD inverse_neon() const {
+#if defined(VECTOR3SIMD_USE_NEON)
+    float32x4_t zero = vdupq_n_f32(0.0f);
+    uint32x4_t is_zero = vceqq_f32(m_value, zero);
+    float32x4_t one = vdupq_n_f32(1.0f);
+    float32x4_t inv = vdivq_f32(one, m_value);
+    return Vector3SIMD(vbicq_f32(inv, vreinterpretq_f32_u32(is_zero)));
+#else
+    return *this;
+#endif
+}
+
      _FORCE_INLINE_ Vector3SIMD posmod_neon(float p_mod) const {
           float32x4_t mod = vdupq_n_f32(p_mod);
           float32x4_t div = vdivq_f32(m_value, mod);

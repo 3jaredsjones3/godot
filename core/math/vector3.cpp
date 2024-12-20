@@ -174,29 +174,30 @@ Vector3 Vector3::snappedf(real_t p_step) const {
 }
 
 Vector3 Vector3::limit_length(real_t p_len) const {
-     const real_t l = length_fallback();
-     Vector3 v = *this;
-     if (l > 0 && p_len < l) {
-          v = v.divide_scalar_fallback(l);
-          v = v.multiply_scalar_fallback(p_len);
-     }
-     return v;
+    const real_t l = length_fallback();
+    Vector3 v = *this;
+    if (l > 0 && p_len < l) {
+        v = v.divide_scalar_fallback(l);
+        v = v.multiply_scalar_fallback(p_len);
+    }
+    return v;
 }
 
-Vector3 Vector3::move_toward(const Vector3 &p_to, real_t p_delta) const {
-     Vector3 v = *this;
-     Vector3 vd;
-     vd.x = p_to.x - v.x;
-     vd.y = p_to.y - v.y;
-     vd.z = p_to.z - v.z;
-     real_t len = vd.length_fallback();
-     Vector3 scaled =
-         vd.divide_scalar_fallback(len).multiply_scalar_fallback(p_delta);
-     Vector3 result;
-     result.x = v.x + scaled.x;
-     result.y = v.y + scaled.y;
-     result.z = v.z + scaled.z;
-     return result;
+Vector3 Vector3::move_toward(const Vector3& p_to, real_t p_delta) const {
+    Vector3 v = *this;
+    Vector3 vd;
+    vd.x = p_to.x - v.x;
+    vd.y = p_to.y - v.y;
+    vd.z = p_to.z - v.z;
+    real_t len = vd.length_fallback();
+    if (len <= p_delta || len < CMP_EPSILON) {
+        return p_to;
+    }
+    Vector3 result = v;
+    result.x += vd.x * p_delta / len;
+    result.y += vd.y * p_delta / len;
+    result.z += vd.z * p_delta / len;
+    return result;
 }
 
 Vector2 Vector3::octahedron_encode() const {
@@ -262,48 +263,6 @@ Vector3 Vector3::posmodv(const Vector3 &p_modv) const {
                     Math::fposmod(z, p_modv.z));
 }
 
-Vector3 &Vector3::operator*=(const Vector3 &p_v) {
-     x *= p_v.x;
-     y *= p_v.y;
-     z *= p_v.z;
-     return *this;
-}
-
-Vector3 Vector3::operator*(const Vector3 &p_v) const {
-     Vector3 res = *this;
-     res *= p_v;
-     return res;
-}
-
-Vector3 &Vector3::operator*=(real_t p_scalar) {
-     x *= p_scalar;
-     y *= p_scalar;
-     z *= p_scalar;
-     return *this;
-}
-
-Vector3 Vector3::operator*(real_t p_scalar) const {
-     return Vector3(x * p_scalar, y * p_scalar, z * p_scalar);
-}
-
-Vector3 &Vector3::operator/=(real_t p_scalar) {
-     x /= p_scalar;
-     y /= p_scalar;
-     z /= p_scalar;
-     return *this;
-}
-
-Vector3 Vector3::operator/(real_t p_scalar) const {
-     Vector3 result;
-     if (p_scalar == 0) {
-          result = Vector3(0.0f, 0.0f, 0.0f);
-          ERR_PRINT("Cannot divide by 0");
-     } else {
-          result = Vector3(x / p_scalar, y / p_scalar, z / p_scalar);
-     }
-     return result;
-}
-
 void Vector3::normalize() {
      real_t lengthsq = length_squared_fallback();
      if (lengthsq == 0) {
@@ -344,7 +303,7 @@ Vector3 Vector3::round() const {
      return Vector3(Math::round(x), Math::round(y), Math::round(z));
 }
 
-Vector3 Vector3::inverse() const {
+Vector3 Vector3::inverse_fallback() const {
      Vector3 result;
      if (x != 0.0f && y != 0.0f && z != 0.0f) {
           result = Vector3(1.0f / x, 1.0f / y, 1.0f / z);
@@ -373,25 +332,20 @@ real_t Vector3::angle_to_fallback(const Vector3 &p_to) const {
      return Math::atan2(c.length_fallback(), dot_fallback(p_to));
 }
 
-real_t Vector3::signed_angle_to_fallback(const Vector3 &p_to,
-                                         const Vector3 &p_axis) const {
-     Vector3 cross_to = cross_fallback(p_to);
-     real_t unsigned_angle = Math::atan2(cross_to.length_fallback(), dot(p_to));
-     real_t sign = cross_to.dot_fallback(p_axis);
-     return (sign < 0) ? -unsigned_angle : unsigned_angle;
+real_t Vector3::signed_angle_to_fallback(const Vector3& p_to, const Vector3& p_axis) const {
+    real_t unsigned_angle = angle_to_fallback(p_to);
+    Vector3 cross_product = cross_fallback(p_to);
+    real_t sign = cross_product.dot_fallback(p_axis);
+    return (sign < 0) ? -unsigned_angle : unsigned_angle;
 }
 
-Vector3 Vector3::direction_to_fallback(const Vector3 &p_to) const {
-     Vector3 ret(p_to.x - x, p_to.y - y, p_to.z - z);
-     Vector3 result = ret;
-
-     if (result.length_squared_fallback() < CMP_EPSILON) {
-          return Vector3(0.0f, 0.0f, 0.0f);
-     } else {
-          result.normalize();
-     }
-
-     return result;
+Vector3 Vector3::direction_to_fallback(const Vector3& p_to) const {
+    Vector3 ret = Vector3(p_to.x - x, p_to.y - y, p_to.z - z);
+    real_t l = ret.length_squared_fallback();
+    if (l == 0) {
+        return Vector3();
+    }
+    return ret.multiply_scalar_fallback(1.0f / Math::sqrt(l));
 }
 
 // slide returns the component of the vector along the given plane, specified by
@@ -470,9 +424,17 @@ Vector3 Vector3::slerp_fallback(const Vector3 &p_to, real_t p_weight) const {
      real_t start_length = Math::sqrt(start_length_sq);
      real_t result_length =
          Math::lerp(start_length, Math::sqrt(end_length_sq), p_weight);
-     real_t angle = angle_to(p_to);
+     real_t angle = angle_to_fallback(p_to);
      return rotated(axis, angle * p_weight) * (result_length / start_length);
 }  // maybe this could use SIMD and be put in vector3SIMD.h
+
+Vector3 Vector3::inverse_fallback() const {
+    return Vector3(
+        x != 0.0f ? 1.0f / x : 0.0f,
+        y != 0.0f ? 1.0f / y : 0.0f,
+        z != 0.0f ? 1.0f / z : 0.0f
+    );
+}
 
 Vector3 Vector3::cubic_interpolate(const Vector3 &p_b, const Vector3 &p_pre_a,
                                    const Vector3 &p_post_b,
