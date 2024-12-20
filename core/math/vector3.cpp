@@ -304,12 +304,6 @@ Vector3 Vector3::operator/(real_t p_scalar) const {
      return result;
 }
 
-Vector3 Vector3::cross(const Vector3 &p_with) const {
-     return Vector3((y * p_with.z) - (z * p_with.y),
-                    (z * p_with.x) - (x * p_with.z),
-                    (x * p_with.y) - (y * p_with.x));
-}
-
 void Vector3::normalize() {
      real_t lengthsq = length_squared_fallback();
      if (lengthsq == 0) {
@@ -375,15 +369,15 @@ Vector3 Vector3::project_fallback(const Vector3 &p_to) const {
 }
 
 real_t Vector3::angle_to_fallback(const Vector3 &p_to) const {
-     Vector3 c = cross(p_to);
-     return Math::atan2(c.length(), dot(p_to));
+     Vector3 c = cross_fallback(p_to);
+     return Math::atan2(c.length_fallback(), dot_fallback(p_to));
 }
 
 real_t Vector3::signed_angle_to_fallback(const Vector3 &p_to,
                                          const Vector3 &p_axis) const {
-     Vector3 cross_to = cross(p_to);
-     real_t unsigned_angle = Math::atan2(cross_to.length(), dot(p_to));
-     real_t sign = cross_to.dot(p_axis);
+     Vector3 cross_to = cross_fallback(p_to);
+     real_t unsigned_angle = Math::atan2(cross_to.length_fallback(), dot(p_to));
+     real_t sign = cross_to.dot_fallback(p_axis);
      return (sign < 0) ? -unsigned_angle : unsigned_angle;
 }
 
@@ -465,7 +459,7 @@ Vector3 Vector3::slerp_fallback(const Vector3 &p_to, real_t p_weight) const {
           // lerp or throw an error.
           return lerp(p_to, p_weight);
      }
-     Vector3 axis = cross(p_to);
+     Vector3 axis = cross_fallback(p_to);
      real_t axis_length_sq = axis.length_squared_fallback();
      if (unlikely(axis_length_sq == 0.0f)) {
           // Colinear vectors have no rotation axis or angle between them, so
