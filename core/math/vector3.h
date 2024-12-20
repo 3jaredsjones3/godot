@@ -532,6 +532,11 @@ struct [[nodiscard]] Vector3 {
      // Operators
      Vector3& operator*=(const Vector3& p_v);
      Vector3 operator*(const Vector3& p_v) const;
+
+     // Vector * scalar multiplication
+     Vector3& operator*=(real_t p_scalar);
+     Vector3 operator*(real_t p_scalar) const;
+
      Vector3& operator/=(real_t p_scalar);
      Vector3 operator/(real_t p_scalar) const;
 
@@ -603,14 +608,6 @@ struct [[nodiscard]] Vector3 {
           }
           return x > p_v.x;
      }
-
-     // Vector * Vector multiplication
-     Vector3& operator*=(const Vector3& p_v);
-     Vector3 operator*(const Vector3& p_v) const;
-
-     // Vector * scalar multiplication
-     Vector3& operator*=(real_t p_scalar);
-     Vector3 operator*(real_t p_scalar) const;
 
      // Conversion operators
      operator String() const;    // Declares conversion to String

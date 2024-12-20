@@ -202,10 +202,16 @@ public:
         return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(length_squared_sse())));
     }
 
-    _FORCE_INLINE_ Vector3SIMD normalize_sse() const {
-        __m128 l = _mm_sqrt_ps(_mm_set1_ps(length_squared_sse()));
-        return Vector3SIMD(_mm_div_ps(m_value, l));
+_FORCE_INLINE_ Vector3SIMD normalize_sse() const {
+    float len_sq = length_squared_sse();
+    if (len_sq == 0.0f) {
+        // Return a zero vector if length is zero
+        return Vector3SIMD(_mm_setzero_ps());
+    } else {
+        __m128 length = _mm_set1_ps(::sqrtf(len_sq));
+        return Vector3SIMD(_mm_div_ps(m_value, length));
     }
+}
 
     _FORCE_INLINE_ Vector3SIMD min_sse(const Vector3SIMD &p_v) const {
         return Vector3SIMD(_mm_min_ps(m_value, p_v.m_value));
@@ -338,12 +344,21 @@ public:
         return Vector3SIMD(_mm_sub_ps(double_proj, m_value));
     }
 
-    _FORCE_INLINE_ Vector3SIMD project_sse(const Vector3SIMD &p_to) const {
-        __m128 dot = _mm_dp_ps(m_value, p_to.m_value, 0x7F);
-        __m128 len_sq = _mm_dp_ps(p_to.m_value, p_to.m_value, 0x7F);
-        __m128 scale = _mm_div_ps(dot, len_sq);
-        return Vector3SIMD(_mm_mul_ps(p_to.m_value, scale));
+_FORCE_INLINE_ Vector3SIMD project_sse(const Vector3SIMD &p_to) const {
+    __m128 dot = _mm_dp_ps(m_value, p_to.m_value, 0x7F);
+    __m128 len_sq = _mm_dp_ps(p_to.m_value, p_to.m_value, 0x7F);
+
+    // Extract the length squared value from the SSE register
+    float len_sq_scalar = _mm_cvtss_f32(len_sq);
+    if (len_sq_scalar == 0.0f) {
+        // If p_to is a zero vector, return a zero vector
+        return Vector3SIMD(_mm_setzero_ps());
     }
+
+    __m128 scale = _mm_div_ps(dot, len_sq);
+    return Vector3SIMD(_mm_mul_ps(p_to.m_value, scale));
+}
+
 
     _FORCE_INLINE_ float distance_to_sse(const Vector3SIMD &p_to) const {
         return sub_sse(p_to).length_sse();
@@ -355,7 +370,15 @@ public:
 
     _FORCE_INLINE_ Vector3SIMD direction_to_sse(const Vector3SIMD &p_to) const {
         Vector3SIMD diff = sub_sse(p_to);
-        return diff.normalize_sse();
+        Vector3SIMD result = diff;
+
+        if (diff.is_zero_approx_sse()) {
+            result = Vector3SIMD(_mm_setzero_ps());
+        } else {
+            result.normalize_sse();
+        }
+
+        return result;
     }
 
     _FORCE_INLINE_ Vector3SIMD rotated_sse(const Vector3SIMD &p_axis, float p_angle) const {

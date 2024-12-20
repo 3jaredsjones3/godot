@@ -305,7 +305,14 @@ Vector3 &Vector3::operator/=(real_t p_scalar) {
 }
 
 Vector3 Vector3::operator/(real_t p_scalar) const {
-    return Vector3(x / p_scalar, y / p_scalar, z / p_scalar);
+    Vector3 result;
+    if (p_scalar == 0) {
+        result = Vector3(0.0f, 0.0f, 0.0f);
+        ERR_PRINT("Cannot divide by 0");
+    } else {
+        result = Vector3(x / p_scalar, y / p_scalar, z / p_scalar);
+    }
+    return result;
 }
 
 Vector3 Vector3::cross(const Vector3 &p_with) const {
@@ -359,12 +366,27 @@ Vector3 Vector3::round() const {
 }
 
 Vector3 Vector3::inverse() const {
-    return Vector3(1.0f / x, 1.0f / y, 1.0f / z);
+    Vector3 result;
+    if (x != 0.0f && y != 0.0f && z != 0.0f) {
+        result = Vector3(1.0f / x, 1.0f / y, 1.0f / z);
+    } else {
+        return Vector3(0.0f, 0.0f, 0.0f);
+        ERR_PRINT("Cannot divide by 0");
+    }
+
+    return result;
 }
 
 Vector3 Vector3::project_fallback(const Vector3 &p_to) const {
-    real_t scalar = dot_fallback(p_to) / p_to.length_squared_fallback();
-    return p_to.multiply_scalar_const_fallback(scalar);
+    Vector3 result;
+    if (p_to.length_squared_fallback() < CMP_EPSILON) {
+        result = Vector3(0.0f,0.0f,0.0f);
+    } else {
+        real_t scalar = dot_fallback(p_to) / p_to.length_squared_fallback();
+        result = p_to.multiply_scalar_const_fallback(scalar);
+    }
+
+    return result;
 } 
 
 real_t Vector3::angle_to_fallback(const Vector3 &p_to) const {
@@ -381,8 +403,15 @@ real_t Vector3::signed_angle_to_fallback(const Vector3 &p_to, const Vector3 &p_a
 
 Vector3 Vector3::direction_to_fallback(const Vector3 &p_to) const {
     Vector3 ret(p_to.x - x, p_to.y - y, p_to.z - z);
-    ret.normalize();
-    return ret;
+    Vector3 result = ret;
+
+    if (result.length_squared_fallback() < CMP_EPSILON) {
+        return Vector3(0.0f,0.0f,0.0f);
+    } else {
+        result.normalize();
+    }
+
+    return result;
 }
 
 // slide returns the component of the vector along the given plane, specified by its normal vector.
