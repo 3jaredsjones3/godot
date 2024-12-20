@@ -41,307 +41,441 @@ struct Vector2;
 struct Vector3i;
 
 struct [[nodiscard]] Vector3 {
-     static const int AXIS_COUNT = 3;
+    static const int AXIS_COUNT = 3;
 
-     enum Axis {
-          AXIS_X,
-          AXIS_Y,
-          AXIS_Z,
-     };
+    enum Axis {
+        AXIS_X,
+        AXIS_Y,
+        AXIS_Z,
+    };
 
-     union {
-          struct {
-               real_t x;
-               real_t y;
-               real_t z;
-          };
-          real_t coord[3] = {0};
-     };
-     // Constructors
-     inline Vector3() {}
-     inline Vector3(real_t p_x, real_t p_y, real_t p_z)
-         : x(p_x), y(p_y), z(p_z) {}
-     Vector3(const Vector3SIMD& p_simd);
+    // Member data
+    union {
+        struct {
+            real_t x;
+            real_t y;
+            real_t z;
+        };
+        real_t coord[3] = {0};
+    };
 
-     // Conversion operators for SIMD
-     operator Vector3SIMD() const { return Vector3SIMD(x, y, z); }
+    // Constructors
+    _FORCE_INLINE_ Vector3() {}
+    _FORCE_INLINE_ Vector3(real_t p_x, real_t p_y, real_t p_z) 
+        : x(p_x), y(p_y), z(p_z) {}
 
-     Vector3(const Vector3SIMD& p_simd) {
-          x = p_simd.x();
-          y = p_simd.y();
-          z = p_simd.z();
-     }
+    // SIMD conversion constructors and operators
+    _FORCE_INLINE_ Vector3(const Vector3SIMD& p_simd) {
+        x = p_simd.x();
+        y = p_simd.y();
+        z = p_simd.z();
+    }
 
-     // Static methods
-     static const Vector3& get_zero_vector() {
-          static const Vector3 zero_vector(0.0f, 0.0f, 0.0f);
-          return zero_vector;
-     }
+    _FORCE_INLINE_ operator Vector3SIMD() const { 
+        return Vector3SIMD(x, y, z); 
+    }
 
-     inline void zero() {
-          x = 0.0f;
-          y = 0.0f;
-          z = 0.0f;
-     }
+    // Static methods
+    static const Vector3& get_zero_vector() {
+        static const Vector3 zero_vector(0.0f, 0.0f, 0.0f);
+        return zero_vector;
+    }
 
-     // Array access
-     inline const real_t& operator[](int p_axis) const {
-          DEV_ASSERT((unsigned int)p_axis < 3);
-          return coord[p_axis];
-     }
+    // Basic operations
+    _FORCE_INLINE_ void zero() {
+        x = 0.0f;
+        y = 0.0f;
+        z = 0.0f;
+    }
 
-     inline real_t& operator[](int p_axis) {
-          DEV_ASSERT((unsigned int)p_axis < 3);
-          return coord[p_axis];
-     }
+    // Array access
+    _FORCE_INLINE_ const real_t& operator[](int p_axis) const {
+        DEV_ASSERT((unsigned int)p_axis < 3);
+        return coord[p_axis];
+    }
 
-     // Axis methods
-     inline Axis min_axis_index() const {
-          return x < y ? (x < z ? AXIS_X : AXIS_Z) : (y < z ? AXIS_Y : AXIS_Z);
-     }
+    _FORCE_INLINE_ real_t& operator[](int p_axis) {
+        DEV_ASSERT((unsigned int)p_axis < 3);
+        return coord[p_axis];
+    }
 
-     inline Axis max_axis_index() const {
-          return x < y ? (y < z ? AXIS_Z : AXIS_Y) : (x < z ? AXIS_Z : AXIS_X);
-     }
+    // Axis methods
+    _FORCE_INLINE_ Axis min_axis_index() const {
+        return x < y ? (x < z ? AXIS_X : AXIS_Z) : (y < z ? AXIS_Y : AXIS_Z);
+    }
 
+    _FORCE_INLINE_ Axis max_axis_index() const {
+        return x < y ? (y < z ? AXIS_Z : AXIS_Y) : (x < z ? AXIS_Z : AXIS_X);
+    }
      // SIMD-enabled methods with fallback
 
-     inline Vector3 min(const Vector3& p_vector3) const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_with(p_vector3);
-          Vector3SIMD simd_result = simd_this.min(simd_with);
-          if (!simd_result.has_error()) {
-               return Vector3(simd_result);
-          }
+_FORCE_INLINE_ Vector3& operator*=(const Vector3& p_v) {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_v);
+    Vector3SIMD simd_result = simd_this.mul_sse(simd_with);
+    *this = Vector3(simd_result);
+    return *this;
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_v);
+    Vector3SIMD simd_result = simd_this.mul_neon(simd_with);
+    *this = Vector3(simd_result);
+    return *this;
+#else
+    return multiply_vector_fallback(p_v);
 #endif
-          return Vector3(MIN(x, p_vector3.x), MIN(y, p_vector3.y),
-                         MIN(z, p_vector3.z));
-     }
+}
 
-     inline Vector3 max(const Vector3& p_vector3) const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_with(p_vector3);
-          Vector3SIMD simd_result = simd_this.max(simd_with);
-          if (!simd_result.has_error()) {
-               return Vector3(simd_result);
-          }
+_FORCE_INLINE_ Vector3& operator*=(real_t p_scalar) {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_result = simd_this.mul_scalar_sse(p_scalar);
+    *this = Vector3(simd_result);
+    return *this;
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_result = simd_this.mul_scalar_neon(p_scalar);
+    *this = Vector3(simd_result);
+    return *this;
+#else
+    return multiply_scalar_fallback(p_scalar);
 #endif
-          return Vector3(MAX(x, p_vector3.x), MAX(y, p_vector3.y),
-                         MAX(z, p_vector3.z));
-     }
+}
 
-     inline Vector3 minf(real_t p_scalar) const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_result = simd_this.minf(p_scalar);
-          if (!simd_result.has_error()) {
-               return Vector3(simd_result);
-          }
+_FORCE_INLINE_ Vector3& operator/=(const Vector3& p_v) {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_v);
+    Vector3SIMD simd_result = simd_this.div_sse(simd_with);
+    *this = Vector3(simd_result);
+    return *this;
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_v);
+    Vector3SIMD simd_result = simd_this.div_neon(simd_with);
+    *this = Vector3(simd_result);
+    return *this;
+#else
+    return divide_vector_fallback(p_v);
 #endif
-          return Vector3(MIN(x, p_scalar), MIN(y, p_scalar), MIN(z, p_scalar));
-     }
+}
 
-     inline Vector3 maxf(real_t p_scalar) const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_result = simd_this.maxf(p_scalar);
-          if (!simd_result.has_error()) {
-               return Vector3(simd_result);
-          }
+_FORCE_INLINE_ Vector3& operator/=(real_t p_scalar) {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_result = simd_this.div_scalar_sse(p_scalar);
+    *this = Vector3(simd_result);
+    return *this;
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_result = simd_this.div_scalar_neon(p_scalar);
+    *this = Vector3(simd_result);
+    return *this;
+#else
+    return divide_scalar_fallback(p_scalar);
 #endif
-          return Vector3(MAX(x, p_scalar), MAX(y, p_scalar), MAX(z, p_scalar));
-     }
+}
 
-     inline real_t dot(const Vector3& p_with) const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_with(p_with);
-          real_t simd_dot = simd_this.dot(simd_with);
-          if (Math::is_finite(simd_dot)) {
-               return simd_dot;
-          }
+// Non-modifying operators
+_FORCE_INLINE_ Vector3 operator*(const Vector3& p_v) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_v);
+    Vector3SIMD simd_result = simd_this.mul_sse(simd_with);
+    return Vector3(simd_result);
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_v);
+    Vector3SIMD simd_result = simd_this.mul_neon(simd_with);
+    return Vector3(simd_result);
+#else
+    return multiply_vector_const_fallback(p_v);
 #endif
-          return dot_fallback(p_with);  // Fallback defined in vector3.cpp
-     }
+}
 
-     inline Vector3 cross(const Vector3& p_with) const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_with(p_with);
-          Vector3SIMD simd_result = simd_this.cross(simd_with);
-          if (!simd_result.has_error()) {
-               return Vector3(simd_result);
-          }
+_FORCE_INLINE_ Vector3 operator*(real_t p_scalar) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_result = simd_this.mul_scalar_sse(p_scalar);
+    return Vector3(simd_result);
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_result = simd_this.mul_scalar_neon(p_scalar);
+    return Vector3(simd_result);
+#else
+    return multiply_scalar_const_fallback(p_scalar);
 #endif
-          return cross_fallback(p_with);  // Fallback defined in vector3.cpp
-     }
+}
 
-     inline real_t length() const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          real_t simd_length = simd_this.length();
-          if (Math::is_finite(simd_length)) {
-               return simd_length;
-          }
+_FORCE_INLINE_ Vector3 min(const Vector3& p_vector3) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_vector3);
+    Vector3SIMD simd_result = simd_this.min_sse(simd_with);
+    return Vector3(simd_result);
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_vector3);
+    Vector3SIMD simd_result = simd_this.min_neon(simd_with);
+    return Vector3(simd_result);
+#else
+    return Vector3(MIN(x, p_vector3.x), MIN(y, p_vector3.y), MIN(z, p_vector3.z));
 #endif
-          return length_fallback();  // Fallback defined in vector3.cpp
-     }
+}
 
-     inline real_t length_squared() const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          real_t simd_lsq = simd_this.length_squared();
-          if (Math::is_finite(simd_lsq)) {
-               return simd_lsq;
-          }
+_FORCE_INLINE_ Vector3 max(const Vector3& p_vector3) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_vector3);
+    Vector3SIMD simd_result = simd_this.max_sse(simd_with);
+    return Vector3(simd_result);
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_vector3);
+    Vector3SIMD simd_result = simd_this.max_neon(simd_with);
+    return Vector3(simd_result);
+#else
+    return Vector3(MAX(x, p_vector3.x), MAX(y, p_vector3.y), MAX(z, p_vector3.z));
 #endif
-          return length_squared_fallback();  // Fallback defined in vector3.cpp
-     }
+}
 
-     inline void normalize() {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          simd_this = simd_this.normalized();
-          if (!simd_this.has_error()) {
-               *this = Vector3(simd_this);
-               return;
-          }
+_FORCE_INLINE_ Vector3 minf(real_t p_scalar) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_result = simd_this.minf_sse(p_scalar);
+    return Vector3(simd_result);
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_result = simd_this.minf_neon(p_scalar);
+    return Vector3(simd_result);
+#else
+    return Vector3(MIN(x, p_scalar), MIN(y, p_scalar), MIN(z, p_scalar));
 #endif
-          real_t l = length();
-          if (l == 0) {
-               x = y = z = 0;
-          } else {
-               x /= l;
-               y /= l;
-               z /= l;
-          }
-     }
+}
 
-     inline Vector3 normalized() const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_result = simd_this.normalized();
-          if (!simd_result.has_error()) {
-               return Vector3(simd_result);
-          }
+_FORCE_INLINE_ Vector3 maxf(real_t p_scalar) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_result = simd_this.maxf_sse(p_scalar);
+    return Vector3(simd_result);
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_result = simd_this.maxf_neon(p_scalar);
+    return Vector3(simd_result);
+#else
+    return Vector3(MAX(x, p_scalar), MAX(y, p_scalar), MAX(z, p_scalar));
 #endif
-          Vector3 v = *this;
-          v.normalize();
-          return v;
-     }
+}
 
-     inline bool is_normalized() const {
-          return Math::is_equal_approx(length_squared(), 1,
-                                       (real_t)UNIT_EPSILON);
-     }
-
-     // Inside the Vector3 class:
-
-     // Slerp interpolation
-     _FORCE_INLINE_ Vector3 slerp(const Vector3& p_to, real_t p_weight) const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_to(p_to);
-          Vector3SIMD simd_result = simd_this.slerp(simd_to, p_weight);
-          if (!simd_result.has_error()) {
-               return Vector3(simd_result);
-          }
+_FORCE_INLINE_ real_t dot(const Vector3& p_with) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_with);
+    return simd_this.dot_sse(simd_with);
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_with);
+    return simd_this.dot_neon(simd_with);
+#else
+    return dot_fallback(p_with);
 #endif
-          return slerp_fallback(p_to, p_weight);
-     }
+}
 
-     // Reflection
-     _FORCE_INLINE_ Vector3 reflect(const Vector3& p_normal) const {
+_FORCE_INLINE_ Vector3 cross(const Vector3& p_with) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_with);
+    Vector3SIMD simd_result = simd_this.cross_sse(simd_with);
+    return Vector3(simd_result);
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_with(p_with);
+    Vector3SIMD simd_result = simd_this.cross_neon(simd_with);
+    return Vector3(simd_result);
+#else
+    return cross_fallback(p_with);
+#endif
+}
+
+_FORCE_INLINE_ real_t length() const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    return simd_this.length_sse();
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    return simd_this.length_neon();
+#else
+    return length_fallback();
+#endif
+}
+
+_FORCE_INLINE_ real_t length_squared() const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    return simd_this.length_squared_sse();
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    return simd_this.length_squared_neon();
+#else
+    return length_squared_fallback();
+#endif
+}
+
+_FORCE_INLINE_ void normalize() {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    *this = Vector3(simd_this.normalize_sse());
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    *this = Vector3(simd_this.normalize_neon());
+#else
+    real_t l = length();
+    if (l == 0) {
+        x = y = z = 0;
+    } else {
+        x /= l;
+        y /= l;
+        z /= l;
+    }
+#endif
+}
+
+_FORCE_INLINE_ Vector3 normalized() const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    return Vector3(simd_this.normalize_sse());
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    return Vector3(simd_this.normalize_neon());
+#else
+    Vector3 v = *this;
+    v.normalize();
+    return v;
+#endif
+}
+
+_FORCE_INLINE_ bool is_normalized() const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    return simd_this.is_normalized_sse();
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    return simd_this.is_normalized_neon();
+#else
+    return Math::is_equal_approx(length_squared(), 1, (real_t)UNIT_EPSILON);
+#endif
+}
+
+_FORCE_INLINE_ Vector3 slerp(const Vector3& p_to, real_t p_weight) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_to(p_to);
+    return Vector3(simd_this.slerp_sse(simd_to, p_weight));
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_to(p_to);
+    return Vector3(simd_this.slerp_neon(simd_to, p_weight));
+#else
+    return slerp_fallback(p_to, p_weight);
+#endif
+}
+
+_FORCE_INLINE_ Vector3 reflect(const Vector3& p_normal) const {
 #ifdef MATH_CHECKS
-          ERR_FAIL_COND_V_MSG(!p_normal.is_normalized(), Vector3(),
-                              "The normal Vector3 must be normalized.");
+    ERR_FAIL_COND_V_MSG(!p_normal.is_normalized(), Vector3(),
+                        "The normal Vector3 must be normalized.");
 #endif
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_normal(p_normal);
-          Vector3SIMD simd_result = simd_this.reflect(simd_normal);
-          if (!simd_result.has_error()) {
-               return Vector3(simd_result);
-          }
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_normal(p_normal);
+    return Vector3(simd_this.reflect_sse(simd_normal));
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_normal(p_normal);
+    return Vector3(simd_this.reflect_neon(simd_normal));
+#else
+    return reflect_fallback(p_normal);
 #endif
-          return reflect_fallback(p_normal);
-     }
+}
 
-     // Slide along surface
-     _FORCE_INLINE_ Vector3 slide(const Vector3& p_normal) const {
+_FORCE_INLINE_ Vector3 slide(const Vector3& p_normal) const {
 #ifdef MATH_CHECKS
-          ERR_FAIL_COND_V_MSG(!p_normal.is_normalized(), Vector3(),
-                              "The normal Vector3 must be normalized.");
+    ERR_FAIL_COND_V_MSG(!p_normal.is_normalized(), Vector3(),
+                        "The normal Vector3 must be normalized.");
 #endif
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_normal(p_normal);
-          Vector3SIMD simd_result = simd_this.slide(simd_normal);
-          if (!simd_result.has_error()) {
-               return Vector3(simd_result);
-          }
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_normal(p_normal);
+    return Vector3(simd_this.slide_sse(simd_normal));
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_normal(p_normal);
+    return Vector3(simd_this.slide_neon(simd_normal));
+#else
+    return slide_fallback(p_normal);
 #endif
-          return slide_fallback(p_normal);
-     }
+}
 
-     // Direction to another point
-     _FORCE_INLINE_ Vector3 direction_to(const Vector3& p_to) const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_to(p_to);
-          Vector3SIMD simd_result = simd_this.direction_to(simd_to);
-          if (!simd_result.has_error()) {
-               return Vector3(simd_result);
-          }
+_FORCE_INLINE_ Vector3 direction_to(const Vector3& p_to) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_to(p_to);
+    return Vector3(simd_this.direction_to_sse(simd_to));
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_to(p_to);
+    return Vector3(simd_this.direction_to_neon(simd_to));
+#else
+    return direction_to_fallback(p_to);
 #endif
-          return direction_to_fallback(p_to);
-     }
+}
 
-     // Signed angle to another vector
-     _FORCE_INLINE_ real_t signed_angle_to(const Vector3& p_to,
-                                           const Vector3& p_axis) const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_to(p_to);
-          Vector3SIMD simd_axis(p_axis);
-          real_t simd_result = simd_this.signed_angle_to(simd_to, simd_axis);
-          if (Math::is_finite(simd_result)) {
-               return simd_result;
-          }
+_FORCE_INLINE_ real_t signed_angle_to(const Vector3& p_to, const Vector3& p_axis) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_to(p_to);
+    Vector3SIMD simd_axis(p_axis);
+    return simd_this.signed_angle_to_sse(simd_to, simd_axis);
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_to(p_to);
+    Vector3SIMD simd_axis(p_axis);
+    return simd_this.signed_angle_to_neon(simd_to, simd_axis);
+#else
+    return signed_angle_to_fallback(p_to, p_axis);
 #endif
-          return signed_angle_to_fallback(p_to, p_axis);
-     }
+}
 
-     // Angle to another vector
-     _FORCE_INLINE_ real_t angle_to(const Vector3& p_to) const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_to(p_to);
-          real_t simd_result = simd_this.angle_to(simd_to);
-          if (Math::is_finite(simd_result)) {
-               return simd_result;
-          }
+_FORCE_INLINE_ real_t angle_to(const Vector3& p_to) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_to(p_to);
+    return simd_this.angle_to_sse(simd_to);
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_to(p_to);
+    return simd_this.angle_to_neon(simd_to);
+#else
+    return angle_to_fallback(p_to);
 #endif
-          return angle_to_fallback(p_to);
-     }
+}
 
-     // Project vector onto another vector
-     _FORCE_INLINE_ Vector3 project(const Vector3& p_to) const {
-#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3SIMD_USE_NEON)
-          Vector3SIMD simd_this(*this);
-          Vector3SIMD simd_to(p_to);
-          Vector3SIMD simd_result = simd_this.project(simd_to);
-          if (!simd_result.has_error()) {
-               return Vector3(simd_result);
-          }
+_FORCE_INLINE_ Vector3 project(const Vector3& p_to) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_to(p_to);
+    return Vector3(simd_this.project_sse(simd_to));
+#elif defined(VECTOR3SIMD_USE_NEON)
+    Vector3SIMD simd_this(*this);
+    Vector3SIMD simd_to(p_to);
+    return Vector3(simd_this.project_neon(simd_to));
+#else
+    return project_fallback(p_to);
 #endif
-          return project_fallback(p_to);
-     }
+}
 
      // Additional operations with fallback
-     // Other methods that remain unchanged
      Vector3 inverse() const { return Vector3(1.0f / x, 1.0f / y, 1.0f / z); }
      void rotate(const Vector3& p_axis, real_t p_angle);
      Vector3 rotated(const Vector3& p_axis, real_t p_angle) const;
@@ -478,10 +612,7 @@ public:
     operator String() const;  // Declares conversion to String
     operator Vector3i() const;  // Declares conversion to Vector3i
 
-     
-private:
-
-    // Binary subtraction (Vector3 - Vector3)
+     // Binary subtraction (Vector3 - Vector3)
     _FORCE_INLINE_ Vector3 operator-(const Vector3 &p_v) const {
         return Vector3(x - p_v.x, y - p_v.y, z - p_v.z);
     }
@@ -510,6 +641,9 @@ private:
         return *this;
     }
 
+
+private:
+
      // Fallback declarations (to be implemented in vector3.cpp)
      Vector3 slerp_fallback(const Vector3& p_to, real_t p_weight) const;
      Vector3 reflect_fallback(const Vector3& p_normal) const;
@@ -529,6 +663,14 @@ private:
      Vector3 cross_fallback(const Vector3& p_with) const;
      real_t length_fallback() const;
      real_t length_squared_fallback() const;
+
+    Vector3& multiply_vector_fallback(const Vector3& p_v);
+    Vector3& multiply_scalar_fallback(real_t p_scalar);
+    Vector3& divide_vector_fallback(const Vector3& p_v);
+    Vector3& divide_scalar_fallback(real_t p_scalar);
+    Vector3 multiply_vector_const_fallback(const Vector3& p_v) const;
+    Vector3 multiply_scalar_const_fallback(real_t p_scalar) const;
+
 };
 
 #endif  // VECTOR3_H

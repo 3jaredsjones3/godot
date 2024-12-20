@@ -35,6 +35,38 @@
 #include "core/string/ustring.h"
 #include "core/math/math_funcs.h"
 
+/******************************************************************************/
+/* IMPORTANT NOTE ON ARITHMETIC OPERATIONS IN VECTOR3 FALLBACK IMPLEMENTATIONS */
+/******************************************************************************/
+/*                                                                            */
+/* When implementing fallback methods for Vector3, we must avoid using        */
+/* arithmetic operator shorthands (+, -, *, /) because:                       */
+/*                                                                           */
+/* 1. These operators are defined in vector3.h to attempt SIMD operations    */
+/*    first before falling back to scalar operations                         */
+/*                                                                           */
+/* 2. If we use these operators within our fallback methods, it creates a    */
+/*    circular dependency:                                                   */
+/*    - Fallback method uses operator                                       */
+/*    - Operator tries SIMD                                                 */
+/*    - SIMD fails, calls fallback                                          */
+/*    - Fallback uses operator...                                           */
+/*                                                                           */
+/* To avoid this, we must either:                                           */
+/* a) Break vectors into their x,y,z components and operate on them         */
+/*    directly (e.g., result.x = v1.x + v2.x)                              */
+/* OR                                                                       */
+/* b) Use the designated fallback methods:                                  */
+/*    - multiply_scalar_fallback()   - For v *= scalar                     */
+/*    - multiply_scalar_const_fallback() - For const v * scalar            */
+/*    - multiply_vector_fallback()   - For v *= vector                     */
+/*    - multiply_vector_const_fallback() - For const v * vector            */
+/*    (And similarly for other operations)                                  */
+/*                                                                           */
+/* This ensures that fallback implementations remain independent of the      */
+/* SIMD-first operator definitions in vector3.h                             */
+/******************************************************************************/
+
 /***************************************************/
 /* Fallback methods for when SIMD is unavailable or */
 /* fails, as referenced by vector3.h                */
@@ -78,11 +110,19 @@ Vector3 Vector3::maxf_fallback(real_t p_scalar) const {
 
 // Distance calculations
 real_t Vector3::distance_to_fallback(const Vector3 &p_to) const {
-	return (p_to - *this).length();
+	Vector3 diff;
+    diff.x = p_to.x - x;
+    diff.y = p_to.y - y;
+    diff.z = p_to.z - z;
+    return diff.length_fallback();
 }
 
 real_t Vector3::distance_squared_to_fallback(const Vector3 &p_to) const {
-	return (p_to - *this).length_squared_fallback();
+	Vector3 diff;
+    diff.x = p_to.x - x;
+    diff.y = p_to.y - y;
+    diff.z = p_to.z - z;
+    return diff.length_squared_fallback();
 }
 
 /***************************************************/
@@ -144,22 +184,31 @@ Vector3 Vector3::limit_length(real_t p_len) const {
     const real_t l = length_fallback();
     Vector3 v = *this;
     if (l > 0 && p_len < l) {
-        v /= l;
-        v *= p_len;
+        v = v.divide_scalar_fallback(l);
+        v = v.multiply_scalar_fallback(p_len);
     }
     return v;
 }
 
 Vector3 Vector3::move_toward(const Vector3 &p_to, real_t p_delta) const {
     Vector3 v = *this;
-    Vector3 vd = p_to - v;
+    Vector3 vd;
+    vd.x = p_to.x - v.x;
+    vd.y = p_to.y - v.y;
+    vd.z = p_to.z - v.z;
     real_t len = vd.length_fallback();
-    return len <= p_delta || len < (real_t)CMP_EPSILON ? p_to : v + vd / len * p_delta;
+    Vector3 scaled = vd.divide_scalar_fallback(len).multiply_scalar_fallback(p_delta);
+    Vector3 result;
+    result.x = v.x + scaled.x;
+    result.y = v.y + scaled.y;
+    result.z = v.z + scaled.z;
+    return result;
 }
 
 Vector2 Vector3::octahedron_encode() const {
     Vector3 n = *this;
-    n /= Math::abs(n.x) + Math::abs(n.y) + Math::abs(n.z);
+    real_t sum = Math::abs(n.x) + Math::abs(n.y) + Math::abs(n.z);
+    n = n.divide_scalar_fallback(sum);
     Vector2 o;
     if (n.z >= 0.0f) {
         o.x = n.x;
@@ -314,7 +363,8 @@ Vector3 Vector3::inverse() const {
 }
 
 Vector3 Vector3::project_fallback(const Vector3 &p_to) const {
-    return p_to * (dot(p_to) / p_to.length_squared_fallback());
+    real_t scalar = dot_fallback(p_to) / p_to.length_squared_fallback();
+    return p_to.multiply_scalar_const_fallback(scalar);
 } 
 
 real_t Vector3::angle_to_fallback(const Vector3 &p_to) const {
@@ -342,11 +392,17 @@ Vector3 Vector3::slide_fallback(const Vector3 &p_normal) const {
     // perhaps we could just normalize the vector for them if they do not have it normalized already
     // we could just output a message about how the operation would proceed faster if they already had it normalized (important if the operation is called many times with the same normal)
 #endif
-    return *this - p_normal * dot(p_normal);
+    Vector3 scaled = p_normal.multiply_scalar_const_fallback(dot_fallback(p_normal));
+    Vector3 result;
+    result.x = x - scaled.x;
+    result.y = y - scaled.y;
+    result.z = z - scaled.z;
+    return result;
 }
 
 Vector3 Vector3::bounce(const Vector3 &p_normal) const {
-    return -reflect(p_normal);
+    Vector3 reflected = reflect_fallback(p_normal);
+    return Vector3(-reflected.x, -reflected.y, -reflected.z);
 }
 
 Vector3 Vector3::reflect_fallback(const Vector3 &p_normal) const {
@@ -355,7 +411,14 @@ Vector3 Vector3::reflect_fallback(const Vector3 &p_normal) const {
     // perhaps we could just normalize the vector for them if they do not have it normalized already
     // we could just output a message about how the operation would proceed faster if they already had it normalized (important if the operation is called many times with the same normal)
 #endif
-    return 2.0f * p_normal * dot(p_normal) - *this;
+    real_t dot_result = dot_fallback(p_normal);
+    real_t scaled_dot = dot_result + dot_result; // Avoid using * to prevent operator overload
+    Vector3 scaled = p_normal.multiply_scalar_const_fallback(scaled_dot);
+    Vector3 result;
+    result.x = scaled.x - x;
+    result.y = scaled.y - y;
+    result.z = scaled.z - z;
+    return result;
 }
 
 Vector3 Vector3::lerp(const Vector3 &p_to, real_t p_weight) const {
@@ -460,6 +523,42 @@ bool Vector3::is_zero_approx() const {
 
 bool Vector3::is_finite() const {
     return Math::is_finite(x) && Math::is_finite(y) && Math::is_finite(z);
+}
+
+Vector3& Vector3::multiply_vector_fallback(const Vector3& p_v) {
+    x *= p_v.x;
+    y *= p_v.y;
+    z *= p_v.z;
+    return *this;
+}
+
+Vector3& Vector3::multiply_scalar_fallback(real_t p_scalar) {
+    x *= p_scalar;
+    y *= p_scalar;
+    z *= p_scalar;
+    return *this;
+}
+
+Vector3& Vector3::divide_vector_fallback(const Vector3& p_v) {
+    x /= p_v.x;
+    y /= p_v.y;
+    z /= p_v.z;
+    return *this;
+}
+
+Vector3& Vector3::divide_scalar_fallback(real_t p_scalar) {
+    x /= p_scalar;
+    y /= p_scalar;
+    z /= p_scalar;
+    return *this;
+}
+
+Vector3 Vector3::multiply_vector_const_fallback(const Vector3& p_v) const {
+    return Vector3(x * p_v.x, y * p_v.y, z * p_v.z);
+}
+
+Vector3 Vector3::multiply_scalar_const_fallback(real_t p_scalar) const {
+    return Vector3(x * p_scalar, y * p_scalar, z * p_scalar);
 }
 
 Vector3::operator String() const {

@@ -295,7 +295,12 @@ Vector3 Basis::get_scale_abs() const {
 
 Vector3 Basis::get_scale_global() const {
 	real_t det_sign = SIGN(determinant());
-	return det_sign * Vector3(rows[0].length(), rows[1].length(), rows[2].length());
+	return Vector3(
+    	det_sign * rows[0].length(),
+    	det_sign * rows[1].length(),
+    	det_sign * rows[2].length()
+	); // It is necessary to decompose the vector and multiply each component by the sign of the determinant
+	// otherwise the * operator between scalar and vector will be ambiguous based on how we have written vector3.h
 }
 
 // get_scale works with get_rotation, use get_scale_abs if you need to enforce positive signature.
@@ -321,7 +326,13 @@ Vector3 Basis::get_scale() const {
 	//
 	// The rotation part of this decomposition is returned by get_rotation* functions.
 	real_t det_sign = SIGN(determinant());
-	return det_sign * get_scale_abs();
+	Vector3 abs_scale = get_scale_abs();
+	return Vector3(
+    	det_sign * abs_scale.x,
+    	det_sign * abs_scale.y,
+    	det_sign * abs_scale.z
+	); // It is necessary to decompose the vector and multiply each component by the sign of the determinant
+	// otherwise the * operator between scalar and vector will be ambiguous based on how we have written vector3.h
 }
 
 // Decomposes a Basis into a rotation-reflection matrix (an element of the group O(3)) and a positive scaling matrix as B = O.S.
