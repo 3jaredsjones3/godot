@@ -34,10 +34,10 @@
 #include "core/string/ustring.h"
 
 real_t Quaternion::angle_to(const Quaternion &p_to) const {
-	real_t d = dot(p_to);
-	// acos does clamping.
-	return Math::acos(d * d * 2 - 1);
+	real_t d = Math::clamp(dot(p_to), -1.0f, 1.0f); // Clamp to avoid domain errors
+	return Math::acos(2.0f * d * d - 1.0f); // Use clear parenthesization
 }
+
 
 Vector3 Quaternion::get_euler(EulerOrder p_order) const {
 #ifdef MATH_CHECKS

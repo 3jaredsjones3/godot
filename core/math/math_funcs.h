@@ -224,6 +224,18 @@ public:
 	static _ALWAYS_INLINE_ float abs(float g) { return absf(g); }
 	static _ALWAYS_INLINE_ int abs(int g) { return g > 0 ? g : -g; }
 
+static _ALWAYS_INLINE_ float clamp(float value, float min, float max) {
+    return CLAMP(value, min, max);
+}
+
+static _ALWAYS_INLINE_ double clamp(double value, double min, double max) {
+    return CLAMP(value, min, max);
+}
+
+static _ALWAYS_INLINE_ int clamp(int value, int min, int max) {
+    return CLAMP(value, min, max);
+}
+
 	static _ALWAYS_INLINE_ double fposmod(double p_x, double p_y) {
 		double value = Math::fmod(p_x, p_y);
 		if (((value < 0) && (p_y > 0)) || ((value > 0) && (p_y < 0))) {
