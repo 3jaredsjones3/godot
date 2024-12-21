@@ -26,8 +26,15 @@ struct [[nodiscard]] Vector3 {
             real_t y;
             real_t z;
         };
-        real_t coord[3] = {0};
+        real_t coord[3];
     };
+
+    // Default constructor to initialize the vector components to zero
+    _FORCE_INLINE_ Vector3() : x(0), y(0), z(0) {}
+
+    _FORCE_INLINE_ static Vector3 get_zero_vector() {
+        return Vector3(0, 0, 0);
+    }
 
     // Array access
     _FORCE_INLINE_ const real_t& operator[](int p_axis) const {

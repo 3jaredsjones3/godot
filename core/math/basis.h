@@ -31,8 +31,9 @@
 #ifndef BASIS_H
 #define BASIS_H
 
+#include "core/math/vector3.h" //make sure this is first
 #include "core/math/quaternion.h"
-#include "core/math/vector3.h"
+
 
 struct [[nodiscard]] Basis {
     

@@ -31,27 +31,40 @@
 #ifndef QUATERNION_H
 #define QUATERNION_H
 
-#include "core/math/math_funcs.h"
+#include "core/math/vector4.h"
 #include "core/math/vector3.h"
+#include "core/math/math_funcs.h"
 #include "core/string/ustring.h"
 
 struct [[nodiscard]] Quaternion {
-	union {
-		struct {
-			real_t x;
-			real_t y;
-			real_t z;
-			real_t w;
-		};
-		real_t components[4] = { 0, 0, 0, 1.0 };
-	};
+    union {
+        struct {
+            real_t x;
+            real_t y;
+            real_t z;
+            real_t w;
+        };
+        Vector4 components;
+    };
 
-	_FORCE_INLINE_ real_t &operator[](int p_idx) {
-		return components[p_idx];
-	}
-	_FORCE_INLINE_ const real_t &operator[](int p_idx) const {
-		return components[p_idx];
-	}
+    // Default constructor
+    _FORCE_INLINE_ Quaternion() : components(Vector4(0, 0, 0, 1.0)) {}
+
+    // Constructor with individual components
+    _FORCE_INLINE_ Quaternion(real_t p_x, real_t p_y, real_t p_z, real_t p_w)
+        : components(Vector4(p_x, p_y, p_z, p_w)) {}
+
+    _FORCE_INLINE_ Quaternion(const Vector4 &vec) : components(vec) {}
+
+    // Access individual components via index
+    _FORCE_INLINE_ real_t &operator[](int p_idx) {
+        return components[p_idx];
+    }
+
+    _FORCE_INLINE_ const real_t &operator[](int p_idx) const {
+        return components[p_idx];
+    }
+
 	_FORCE_INLINE_ real_t length_squared() const;
 	bool is_equal_approx(const Quaternion &p_quaternion) const;
 	bool is_finite() const;
@@ -82,7 +95,7 @@ struct [[nodiscard]] Quaternion {
 		r_axis.x = x * r;
 		r_axis.y = y * r;
 		r_axis.z = z * r;
-	}
+	} //need to optimize to use vector3's * operator to get simd benefits
 
 	void operator*=(const Quaternion &p_q);
 	Quaternion operator*(const Quaternion &p_q) const;
@@ -162,7 +175,7 @@ struct [[nodiscard]] Quaternion {
 };
 
 real_t Quaternion::dot(const Quaternion &p_q) const {
-	return x * p_q.x + y * p_q.y + z * p_q.z + w * p_q.w;
+    return components.dot(p_q.components);
 }
 
 real_t Quaternion::length_squared() const {
@@ -170,63 +183,51 @@ real_t Quaternion::length_squared() const {
 }
 
 void Quaternion::operator+=(const Quaternion &p_q) {
-	x += p_q.x;
-	y += p_q.y;
-	z += p_q.z;
-	w += p_q.w;
+    components += p_q.components;
 }
 
 void Quaternion::operator-=(const Quaternion &p_q) {
-	x -= p_q.x;
-	y -= p_q.y;
-	z -= p_q.z;
-	w -= p_q.w;
+    components -= p_q.components;
 }
 
 void Quaternion::operator*=(real_t p_s) {
-	x *= p_s;
-	y *= p_s;
-	z *= p_s;
-	w *= p_s;
+    components *= p_s;
 }
 
 void Quaternion::operator/=(real_t p_s) {
-	*this *= 1.0f / p_s;
+    components /= p_s;
 }
 
 Quaternion Quaternion::operator+(const Quaternion &p_q2) const {
-	const Quaternion &q1 = *this;
-	return Quaternion(q1.x + p_q2.x, q1.y + p_q2.y, q1.z + p_q2.z, q1.w + p_q2.w);
+    return Quaternion(components + p_q2.components);
 }
 
 Quaternion Quaternion::operator-(const Quaternion &p_q2) const {
-	const Quaternion &q1 = *this;
-	return Quaternion(q1.x - p_q2.x, q1.y - p_q2.y, q1.z - p_q2.z, q1.w - p_q2.w);
+    return Quaternion(components - p_q2.components);
 }
 
 Quaternion Quaternion::operator-() const {
-	const Quaternion &q2 = *this;
-	return Quaternion(-q2.x, -q2.y, -q2.z, -q2.w);
+    return Quaternion(-components);
 }
 
 Quaternion Quaternion::operator*(real_t p_s) const {
-	return Quaternion(x * p_s, y * p_s, z * p_s, w * p_s);
+    return Quaternion(components * p_s);
 }
 
 Quaternion Quaternion::operator/(real_t p_s) const {
-	return *this * (1.0f / p_s);
+    return Quaternion(components / p_s);
 }
 
 bool Quaternion::operator==(const Quaternion &p_quaternion) const {
-	return x == p_quaternion.x && y == p_quaternion.y && z == p_quaternion.z && w == p_quaternion.w;
+    return components == p_quaternion.components;
 }
 
 bool Quaternion::operator!=(const Quaternion &p_quaternion) const {
-	return x != p_quaternion.x || y != p_quaternion.y || z != p_quaternion.z || w != p_quaternion.w;
+    return components != p_quaternion.components;
 }
 
 _FORCE_INLINE_ Quaternion operator*(real_t p_real, const Quaternion &p_quaternion) {
-	return p_quaternion * p_real;
+    return Quaternion(p_quaternion.components * p_real);
 }
 
 #endif // QUATERNION_H
