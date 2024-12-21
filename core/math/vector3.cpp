@@ -129,51 +129,51 @@ real_t Vector3::distance_squared_to_fallback(const Vector3 &p_to) const {
 /* Original fallback (scalar-only) implementations  */
 /***************************************************/
 
-void Vector3::rotate(const Vector3 &p_axis, real_t p_angle) {
+void Vector3::rotate_fallback(const Vector3 &p_axis, real_t p_angle) {
      *this = Basis(p_axis, p_angle).xform(*this);
 }
 
-Vector3 Vector3::rotated(const Vector3 &p_axis, real_t p_angle) const {
+Vector3 Vector3::rotated_fallback(const Vector3 &p_axis, real_t p_angle) const {
      Vector3 r = *this;
-     r.rotate(p_axis, p_angle);
+     r.rotate_fallback(p_axis, p_angle);
      return r;
 }
 
-Vector3 Vector3::clamp(const Vector3 &p_min, const Vector3 &p_max) const {
+Vector3 Vector3::clamp_fallback(const Vector3 &p_min, const Vector3 &p_max) const {
      return Vector3(CLAMP(x, p_min.x, p_max.x), CLAMP(y, p_min.y, p_max.y),
                     CLAMP(z, p_min.z, p_max.z));
 }
 
-Vector3 Vector3::clampf(real_t p_min, real_t p_max) const {
+Vector3 Vector3::clampf_fallback(real_t p_min, real_t p_max) const {
      return Vector3(CLAMP(x, p_min, p_max), CLAMP(y, p_min, p_max),
                     CLAMP(z, p_min, p_max));
 }
 
-void Vector3::snap(const Vector3 &p_step) {
+void Vector3::snap_fallback(const Vector3 &p_step) {
      x = Math::snapped(x, p_step.x);
      y = Math::snapped(y, p_step.y);
      z = Math::snapped(z, p_step.z);
 }
 
-Vector3 Vector3::snapped(const Vector3 &p_step) const {
+Vector3 Vector3::snapped_fallback(const Vector3 &p_step) const {
      Vector3 v = *this;
-     v.snap(p_step);
+     v.snap_fallback(p_step);
      return v;
 }
 
-void Vector3::snapf(real_t p_step) {
+void Vector3::snapf_fallback(real_t p_step) {
      x = Math::snapped(x, p_step);
      y = Math::snapped(y, p_step);
      z = Math::snapped(z, p_step);
 }
 
-Vector3 Vector3::snappedf(real_t p_step) const {
+Vector3 Vector3::snappedf_fallback(real_t p_step) const {
      Vector3 v = *this;
-     v.snapf(p_step);
+     v.snapf_fallback(p_step);
      return v;
 }
 
-Vector3 Vector3::limit_length(real_t p_len) const {
+Vector3 Vector3::limit_length_fallback(real_t p_len) const {
     const real_t l = length_fallback();
     Vector3 v = *this;
     if (l > 0 && p_len < l) {
@@ -183,7 +183,7 @@ Vector3 Vector3::limit_length(real_t p_len) const {
     return v;
 }
 
-Vector3 Vector3::move_toward(const Vector3& p_to, real_t p_delta) const {
+Vector3 Vector3::move_toward_fallback(const Vector3& p_to, real_t p_delta) const {
     Vector3 v = *this;
     Vector3 vd;
     vd.x = p_to.x - v.x;
@@ -200,7 +200,7 @@ Vector3 Vector3::move_toward(const Vector3& p_to, real_t p_delta) const {
     return result;
 }
 
-Vector2 Vector3::octahedron_encode() const {
+Vector2 Vector3::octahedron_encode_fallback() const {
      Vector3 n = *this;
      real_t sum = Math::abs(n.x) + Math::abs(n.y) + Math::abs(n.z);
      n = n.divide_scalar_fallback(sum);
@@ -217,7 +217,7 @@ Vector2 Vector3::octahedron_encode() const {
      return o;
 }
 
-Vector3 Vector3::octahedron_decode(const Vector2 &p_oct) {
+Vector3 Vector3::octahedron_decode_fallback(const Vector2 &p_oct) {
      Vector2 f(p_oct.x * 2.0f - 1.0f, p_oct.y * 2.0f - 1.0f);
      Vector3 n(f.x, f.y, 1.0f - Math::abs(f.x) - Math::abs(f.y));
      const real_t t = CLAMP(-n.z, 0.0f, 1.0f);
@@ -245,7 +245,7 @@ Vector3 Vector3::octahedron_tangent_decode(const Vector2 &p_oct,
      return res;
 }
 
-Basis Vector3::outer(const Vector3 &p_with) const {
+Basis Vector3::outer_fallback(const Vector3 &p_with) const {
      Basis basis;
      basis.rows[0] = Vector3(x * p_with.x, x * p_with.y, x * p_with.z);
      basis.rows[1] = Vector3(y * p_with.x, y * p_with.y, y * p_with.z);
@@ -253,17 +253,7 @@ Basis Vector3::outer(const Vector3 &p_with) const {
      return basis;
 }
 
-Vector3 Vector3::posmod(real_t p_mod) const {
-     return Vector3(Math::fposmod(x, p_mod), Math::fposmod(y, p_mod),
-                    Math::fposmod(z, p_mod));
-}
-
-Vector3 Vector3::posmodv(const Vector3 &p_modv) const {
-     return Vector3(Math::fposmod(x, p_modv.x), Math::fposmod(y, p_modv.y),
-                    Math::fposmod(z, p_modv.z));
-}
-
-void Vector3::normalize() {
+void Vector3::normalize_fallback() {
      real_t lengthsq = length_squared_fallback();
      if (lengthsq == 0) {
           x = y = z = 0;
@@ -275,31 +265,31 @@ void Vector3::normalize() {
      }
 }
 
-Vector3 Vector3::normalized() const {
+Vector3 Vector3::normalized_fallback() const {
      Vector3 v = *this;
      v.normalize();
      return v;
 }
 
-bool Vector3::is_normalized() const {
+bool Vector3::is_normalized_fallback() const {
      return Math::is_equal_approx(length_squared_fallback(), (real_t)1.0);
 }
 
-Vector3 Vector3::abs() const {
+Vector3 Vector3::abs_fallback() const {
      return Vector3(Math::abs(x), Math::abs(y), Math::abs(z));
 }
 
-Vector3 Vector3::sign() const { return Vector3(SIGN(x), SIGN(y), SIGN(z)); }
+Vector3 Vector3::sign_fallback() const { return Vector3(SIGN(x), SIGN(y), SIGN(z)); }
 
-Vector3 Vector3::floor() const {
+Vector3 Vector3::floor_fallback() const {
      return Vector3(Math::floor(x), Math::floor(y), Math::floor(z));
 }
 
-Vector3 Vector3::ceil() const {
+Vector3 Vector3::ceil_fallback() const {
      return Vector3(Math::ceil(x), Math::ceil(y), Math::ceil(z));
 }
 
-Vector3 Vector3::round() const {
+Vector3 Vector3::round_fallback() const {
      return Vector3(Math::round(x), Math::round(y), Math::round(z));
 }
 
@@ -369,7 +359,7 @@ Vector3 Vector3::slide_fallback(const Vector3 &p_normal) const {
      return result;
 }
 
-Vector3 Vector3::bounce(const Vector3 &p_normal) const {
+Vector3 Vector3::bounce_fallback(const Vector3 &p_normal) const {
      Vector3 reflected = reflect_fallback(p_normal);
      return Vector3(-reflected.x, -reflected.y, -reflected.z);
 }
@@ -395,13 +385,13 @@ Vector3 Vector3::reflect_fallback(const Vector3 &p_normal) const {
      return result;
 }
 
-Vector3 Vector3::lerp(const Vector3 &p_to, real_t p_weight) const {
+Vector3 Vector3::lerp_fallback(const Vector3 &p_to, real_t p_weight) const {
      Vector3 res = *this;
      res.x = Math::lerp(res.x, p_to.x, p_weight);
      res.y = Math::lerp(res.y, p_to.y, p_weight);
      res.z = Math::lerp(res.z, p_to.z, p_weight);
      return res;
-}  // I'm not sure if SIMD could be used here... but maybe?
+}
 
 Vector3 Vector3::slerp_fallback(const Vector3 &p_to, real_t p_weight) const {
      // This method seems more complicated than it really is, since we write out
@@ -425,9 +415,8 @@ Vector3 Vector3::slerp_fallback(const Vector3 &p_to, real_t p_weight) const {
      real_t result_length =
          Math::lerp(start_length, Math::sqrt(end_length_sq), p_weight);
      real_t angle = angle_to_fallback(p_to);
-     return rotated(axis, angle * p_weight) * (result_length / start_length);
-}  // maybe this could use SIMD and be put in vector3SIMD.h
-
+     return rotated_fallback(axis, angle * p_weight) * (result_length / start_length);
+} 
 Vector3 Vector3::inverse_fallback() const {
     return Vector3(
         x != 0.0f ? 1.0f / x : 0.0f,
@@ -436,7 +425,7 @@ Vector3 Vector3::inverse_fallback() const {
     );
 }
 
-Vector3 Vector3::cubic_interpolate(const Vector3 &p_b, const Vector3 &p_pre_a,
+Vector3 Vector3::cubic_interpolate_fallback(const Vector3 &p_b, const Vector3 &p_pre_a,
                                    const Vector3 &p_post_b,
                                    real_t p_weight) const {
      Vector3 res = *this;
@@ -449,7 +438,7 @@ Vector3 Vector3::cubic_interpolate(const Vector3 &p_b, const Vector3 &p_pre_a,
      return res;
 }
 
-Vector3 Vector3::cubic_interpolate_in_time(
+Vector3 Vector3::cubic_interpolate_in_time_fallback(
     const Vector3 &p_b, const Vector3 &p_pre_a, const Vector3 &p_post_b,
     real_t p_weight, real_t p_b_t, real_t p_pre_a_t, real_t p_post_b_t) const {
      Vector3 res = *this;
@@ -465,7 +454,7 @@ Vector3 Vector3::cubic_interpolate_in_time(
      return res;
 }
 
-Vector3 Vector3::bezier_interpolate(const Vector3 &p_control_1,
+Vector3 Vector3::bezier_interpolate_fallback(const Vector3 &p_control_1,
                                     const Vector3 &p_control_2,
                                     const Vector3 &p_end, real_t p_t) const {
      Vector3 res = *this;
@@ -478,7 +467,7 @@ Vector3 Vector3::bezier_interpolate(const Vector3 &p_control_1,
      return res;
 }
 
-Vector3 Vector3::bezier_derivative(const Vector3 &p_control_1,
+Vector3 Vector3::bezier_derivative_fallback(const Vector3 &p_control_1,
                                    const Vector3 &p_control_2,
                                    const Vector3 &p_end, real_t p_t) const {
      Vector3 res = *this;
@@ -517,12 +506,12 @@ bool Vector3::operator>=(const Vector3 &p_v) const {
      return *this > p_v || *this == p_v;
 }
 
-bool Vector3::is_equal_approx(const Vector3 &p_v) const {
+bool Vector3::is_equal_approx_fallback(const Vector3 &p_v) const {
      return Math::is_equal_approx(x, p_v.x) &&
             Math::is_equal_approx(y, p_v.y) && Math::is_equal_approx(z, p_v.z);
 }
 
-bool Vector3::is_zero_approx() const {
+bool Vector3::is_zero_approx_fallback() const {
      return Math::is_zero_approx(x) && Math::is_zero_approx(y) &&
             Math::is_zero_approx(z);
 }

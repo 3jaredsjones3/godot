@@ -238,17 +238,17 @@ _FORCE_INLINE_ Vector3i operator*(int32_t p_scalar, const Vector3i &p_vector) {
 	return p_vector * p_scalar;
 }
 
-_FORCE_INLINE_ Vector3i operator*(int64_t p_scalar, const Vector3i &p_vector) {
-	return p_vector * p_scalar;
-}
+//_FORCE_INLINE_ Vector3i operator*(int64_t p_scalar, const Vector3i &p_vector) {
+//	return p_vector * p_scalar;
+//}
 
-_FORCE_INLINE_ Vector3i operator*(float p_scalar, const Vector3i &p_vector) {
-	return p_vector * p_scalar;
-}
+//_FORCE_INLINE_ Vector3i operator*(float p_scalar, const Vector3i &p_vector) {
+//	return p_vector * p_scalar;
+//}
 
-_FORCE_INLINE_ Vector3i operator*(double p_scalar, const Vector3i &p_vector) {
-	return p_vector * p_scalar;
-}
+//_FORCE_INLINE_ Vector3i operator*(double p_scalar, const Vector3i &p_vector) {
+//	return p_vector * p_scalar;
+//}
 
 Vector3i &Vector3i::operator/=(int32_t p_scalar) {
 	x /= p_scalar;
