@@ -30,6 +30,7 @@
 
 #include "basis.h"
 
+#include "core/math/vector3SIMD.h"
 #include "core/math/math_funcs.h"
 #include "core/string/ustring.h"
 
@@ -662,43 +663,198 @@ Vector3 Basis::get_euler(EulerOrder p_order) const {
 }
 
 void Basis::set_euler(const Vector3 &p_euler, EulerOrder p_order) {
-	real_t c, s;
+    // Precompute trigonometric values
+    real_t cx = Math::cos(p_euler.x);
+    real_t sx = Math::sin(p_euler.x);
+    real_t cy = Math::cos(p_euler.y);
+    real_t sy = Math::sin(p_euler.y);
+    real_t cz = Math::cos(p_euler.z);
+    real_t sz = Math::sin(p_euler.z);
 
-	c = Math::cos(p_euler.x);
-	s = Math::sin(p_euler.x);
-	Basis xmat(1, 0, 0, 0, c, -s, 0, s, c);
+    switch (p_order) {
+        case EulerOrder::XYZ: {
+#if defined(VECTOR3SIMD_USE_SSE)
+            rows[0] = Vector3(cy * cz, cy * sz, -sy);
 
-	c = Math::cos(p_euler.y);
-	s = Math::sin(p_euler.y);
-	Basis ymat(c, 0, s, 0, 1, 0, -s, 0, c);
+            Vector3SIMD r1_a(sx * sy, sx * sy, cx);
+            Vector3SIMD r1_b(cz, sz, cy);
+            rows[1] = Vector3(r1_a.mul_sse(r1_b));
 
-	c = Math::cos(p_euler.z);
-	s = Math::sin(p_euler.z);
-	Basis zmat(c, -s, 0, s, c, 0, 0, 0, 1);
+            Vector3SIMD r2_a(cx * sy, cx * sy, -sx);
+            Vector3SIMD r2_b(cz, sz, cy);
+            rows[2] = Vector3(r2_a.mul_sse(r2_b));
+#elif defined(VECTOR3SIMD_USE_NEON)
+            rows[0] = Vector3(cy * cz, cy * sz, -sy);
 
-	switch (p_order) {
-		case EulerOrder::XYZ: {
-			*this = xmat * (ymat * zmat);
-		} break;
-		case EulerOrder::XZY: {
-			*this = xmat * zmat * ymat;
-		} break;
-		case EulerOrder::YXZ: {
-			*this = ymat * xmat * zmat;
-		} break;
-		case EulerOrder::YZX: {
-			*this = ymat * zmat * xmat;
-		} break;
-		case EulerOrder::ZXY: {
-			*this = zmat * xmat * ymat;
-		} break;
-		case EulerOrder::ZYX: {
-			*this = zmat * ymat * xmat;
-		} break;
-		default: {
-			ERR_FAIL_MSG("Invalid Euler order parameter.");
-		}
-	}
+            Vector3SIMD r1_a(sx * sy, sx * sy, cx);
+            Vector3SIMD r1_b(cz, sz, cy);
+            rows[1] = Vector3(r1_a.mul_neon(r1_b));
+
+            Vector3SIMD r2_a(cx * sy, cx * sy, -sx);
+            Vector3SIMD r2_b(cz, sz, cy);
+            rows[2] = Vector3(r2_a.mul_neon(r2_b));
+#else
+            rows[0] = Vector3(cy * cz, cy * sz, -sy);
+            rows[1] = Vector3(sx * sy * cz - cx * sz, sx * sy * sz + cx * cz, sx * cy);
+            rows[2] = Vector3(cx * sy * cz + sx * sz, cx * sy * sz - sx * cz, cx * cy);
+#endif
+            break;
+        }
+        case EulerOrder::XZY: {
+#if defined(VECTOR3SIMD_USE_SSE)
+            Vector3SIMD r0_a(cy, sx, cy);
+            Vector3SIMD r0_b(cz, sy * sz, sx * sz);
+            rows[0] = Vector3(r0_a.mul_sse(r0_b));
+
+            rows[1] = Vector3(sz, cx * cz, -sx * cz);
+
+            Vector3SIMD r2_a(-sy * cz, sx * cy, cx * cy);
+            Vector3SIMD r2_b(1.0f, sz, sz);
+            rows[2] = Vector3(r2_a.mul_sse(r2_b));
+#elif defined(VECTOR3SIMD_USE_NEON)
+            Vector3SIMD r0_a(cy, sx, cy);
+            Vector3SIMD r0_b(cz, sy * sz, sx * sz);
+            rows[0] = Vector3(r0_a.mul_neon(r0_b));
+
+            rows[1] = Vector3(sz, cx * cz, -sx * cz);
+
+            Vector3SIMD r2_a(-sy * cz, sx * cy, cx * cy);
+            Vector3SIMD r2_b(1.0f, sz, sz);
+            rows[2] = Vector3(r2_a.mul_neon(r2_b));
+#else
+            rows[0] = Vector3(cy * cz, sx * sy - cx * cy * sz, cx * sy + sx * cy * sz);
+            rows[1] = Vector3(sz, cx * cz, -sx * cz);
+            rows[2] = Vector3(-sy * cz, sx * cy + cx * sy * sz, cx * cy - sx * sy * sz);
+#endif
+            break;
+        }
+        case EulerOrder::YXZ: {
+#if defined(VECTOR3SIMD_USE_SSE)
+            Vector3SIMD r0_a(cy, sx * sy, cx * sy);
+            Vector3SIMD r0_b(cz, sz, 1.0f);
+            rows[0] = Vector3(r0_a.mul_sse(r0_b));
+
+            rows[1] = Vector3(cx * sz, cx * cz, -sx);
+
+            Vector3SIMD r2_a(cy * sx, cy * sx, cx);
+            Vector3SIMD r2_b(sz, cz, cy);
+            rows[2] = Vector3(r2_a.mul_sse(r2_b));
+#elif defined(VECTOR3SIMD_USE_NEON)
+            Vector3SIMD r0_a(cy, sx * sy, cx * sy);
+            Vector3SIMD r0_b(cz, sz, 1.0f);
+            rows[0] = Vector3(r0_a.mul_neon(r0_b));
+
+            rows[1] = Vector3(cx * sz, cx * cz, -sx);
+
+            Vector3SIMD r2_a(cy * sx, cy * sx, cx);
+            Vector3SIMD r2_b(sz, cz, cy);
+            rows[2] = Vector3(r2_a.mul_neon(r2_b));
+#else
+            rows[0] = Vector3(cy * cz + sx * sy * sz, cz * sx * sy - cy * sz, cx * sy);
+            rows[1] = Vector3(cx * sz, cx * cz, -sx);
+            rows[2] = Vector3(cy * sx * sz - cz * sy, cy * cz * sx + sy * sz, cx * cy);
+#endif
+            break;
+        }
+        case EulerOrder::YZX: {
+#if defined(VECTOR3SIMD_USE_SSE)
+            rows[0] = Vector3(cy * cz, sz, -sy * cz);
+
+            Vector3SIMD r1_a(sx * sy, cx, sx * cy);
+            Vector3SIMD r1_b(1.0f, cz, sz);
+            rows[1] = Vector3(r1_a.mul_sse(r1_b));
+
+            Vector3SIMD r2_a(cx * sy, -sx, cx * cy);
+            Vector3SIMD r2_b(1.0f, cz, sz);
+            rows[2] = Vector3(r2_a.mul_sse(r2_b));
+#elif defined(VECTOR3SIMD_USE_NEON)
+            rows[0] = Vector3(cy * cz, sz, -sy * cz);
+
+            Vector3SIMD r1_a(sx * sy, cx, sx * cy);
+            Vector3SIMD r1_b(1.0f, cz, sz);
+            rows[1] = Vector3(r1_a.mul_neon(r1_b));
+
+            Vector3SIMD r2_a(cx * sy, -sx, cx * cy);
+            Vector3SIMD r2_b(1.0f, cz, sz);
+            rows[2] = Vector3(r2_a.mul_neon(r2_b));
+#else
+            rows[0] = Vector3(cy * cz, sz, -sy * cz);
+            rows[1] = Vector3(sx * sy - cx * cy * sz, cx * cz, sx * cy + cx * sy * sz);
+            rows[2] = Vector3(cx * sy + sx * cy * sz, -sx * cz, cx * cy - sx * sy * sz);
+#endif
+            break;
+        }
+        case EulerOrder::ZXY: {
+#if defined(VECTOR3SIMD_USE_SSE)
+            Vector3SIMD r0_a(cy, sx, cy);
+            Vector3SIMD r0_b(cz, sz, sx * sz);
+            rows[0] = Vector3(r0_a.mul_sse(r0_b));
+
+            Vector3SIMD r1_a(cz, sx * sy, cx);
+            Vector3SIMD r1_b(sz, cy, sx);
+            rows[1] = Vector3(r1_a.mul_sse(r1_b));
+
+            rows[2] = Vector3(-cx * sy, sx, cx * cy);
+#elif defined(VECTOR3SIMD_USE_NEON)
+            Vector3SIMD r0_a(cy, sx, cy);
+            Vector3SIMD r0_b(cz, sz, sx * sz);
+            rows[0] = Vector3(r0_a.mul_neon(r0_b));
+
+            Vector3SIMD r1_a(cz, sx * sy, cx);
+            Vector3SIMD r1_b(sz, cy, sx);
+            rows[1] = Vector3(r1_a.mul_neon(r1_b));
+
+            rows[2] = Vector3(-cx * sy, sx, cx * cy);
+#else
+            rows[0] = Vector3(cy * cz - sx * sy * sz, -cx * sz, cz * sy + cy * sx * sz);
+            rows[1] = Vector3(cz * sx * sy + cy * sz, cx * cz, -cy * cz * sx + sy * sz);
+            rows[2] = Vector3(-cx * sy, sx, cx * cy);
+#endif
+            break;
+        }
+        case EulerOrder::ZYX: {
+#if defined(VECTOR3SIMD_USE_SSE)
+            Vector3SIMD r0_a(cy, sx * sy, cx * sy);
+            Vector3SIMD r0_b(cz, cz, cz);
+            Vector3SIMD r0_c(0, -cx * sz, sx * sz);
+            Vector3SIMD r0 = r0_a.mul_sse(r0_b);
+            rows[0] = Vector3(r0.add_sse(r0_c));
+
+            Vector3SIMD r1_a(cy, cx, cx * sy);
+            Vector3SIMD r1_b(sz, cz, sz);
+            Vector3SIMD r1_c(0, sx * sy * sz, -cz * sx);
+            Vector3SIMD r1 = r1_a.mul_sse(r1_b);
+            rows[1] = Vector3(r1.add_sse(r1_c));
+
+            Vector3SIMD r2_a(-sy, cy * sx, cx * cy);
+            rows[2] = Vector3(r2_a);
+#elif defined(VECTOR3SIMD_USE_NEON)
+            Vector3SIMD r0_a(cy, sx * sy, cx * sy);
+            Vector3SIMD r0_b(cz, cz, cz);
+            Vector3SIMD r0_c(0, -cx * sz, sx * sz);
+            Vector3SIMD r0 = r0_a.mul_neon(r0_b);
+            rows[0] = Vector3(r0.add_neon(r0_c));
+
+            Vector3SIMD r1_a(cy, cx, cx * sy);
+            Vector3SIMD r1_b(sz, cz, sz);
+            Vector3SIMD r1_c(0, sx * sy * sz, -cz * sx);
+            Vector3SIMD r1 = r1_a.mul_neon(r1_b);
+            rows[1] = Vector3(r1.add_neon(r1_c));
+
+            Vector3SIMD r2_a(-sy, cy * sx, cx * cy);
+            rows[2] = Vector3(r2_a);
+#else
+            rows[0] = Vector3(cy * cz, cz * sx * sy - cx * sz, cx * cz * sy + sx * sz);
+            rows[1] = Vector3(cy * sz, cx * cz + sx * sy * sz, cx * sy * sz - cz * sx);
+            rows[2] = Vector3(-sy, cy * sx, cx * cy);
+#endif
+            break;
+        }
+        default: {
+            ERR_FAIL_MSG("Invalid or no rotation order specified.");
+            break;
+        }
+    }
 }
 
 bool Basis::is_equal_approx(const Basis &p_basis) const {

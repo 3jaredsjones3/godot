@@ -38,7 +38,6 @@ real_t Quaternion::angle_to(const Quaternion &p_to) const {
 	return Math::acos(2.0f * d * d - 1.0f); // Use clear parenthesization
 }
 
-
 Vector3 Quaternion::get_euler(EulerOrder p_order) const {
 #ifdef MATH_CHECKS
 	ERR_FAIL_COND_V_MSG(!is_normalized(), Vector3(0, 0, 0), "The quaternion " + operator String() + " must be normalized.");
