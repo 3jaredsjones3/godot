@@ -81,6 +81,26 @@ Quaternion Quaternion::quaternion_mul_fallback(const Quaternion &p_q) const {
     );
 }
 
+Quaternion::Quaternion(const Vector3& p_v0, const Vector3& p_v1) {
+    Vector3 c = p_v0.cross(p_v1);
+    real_t d = p_v0.dot(p_v1);
+
+    if (d < -1.0f + CMP_EPSILON) {
+        x = 0;
+        y = 1;
+        z = 0;
+        w = 0;
+    } else {
+        real_t s = Math::sqrt((1.0f + d) * 2.0f);
+        real_t rs = 1.0f / s;
+
+        x = c.x * rs;
+        y = c.y * rs;
+        z = c.z * rs;
+        w = s * 0.5f;
+    }
+}
+
 bool Quaternion::is_equal_approx(const Quaternion &p_quaternion) const {
     return Math::is_equal_approx(x, p_quaternion.x) && 
            Math::is_equal_approx(y, p_quaternion.y) && 
