@@ -5,26 +5,25 @@
 #include <cstddef>  // For alignas
 #include <cstdint>
 
-#include "basis.h"
-#include "vector2.h"
+#include "core/typedefs.h"  // This has the real_t definition and _FORCE_INLINE_
 #include "core/math/math_defs.h"
 #include "core/math/math_funcs.h"
-#include "typedefs.h"
+#include "vector2.h"
+
+// Forward declarations 
+struct Vector3;
+struct Vector2;
+struct Quaternion;
 
 // SSE headers
 #if defined(__SSE__) || (defined(_M_X64) && !defined(__EMSCRIPTEN__))
 #define VECTOR3SIMD_USE_SSE
 #include <emmintrin.h>  // SSE2
 #include <xmmintrin.h>  // SSE
-#if defined(__SSE3__)
-#include <pmmintrin.h>  // SSE3
-#endif
-#if defined(__SSE4_1__)
-#include <smmintrin.h>  // SSE4.1
-#endif
+// ... rest of SSE includes
 #endif
 
-// NEON headers
+// NEON headers 
 #if defined(__ARM_NEON) || defined(__aarch64__)
 #define VECTOR3SIMD_USE_NEON
 #include <arm_neon.h>

@@ -1,14 +1,15 @@
 #ifndef VECTOR3_H
 #define VECTOR3_H
 
+
 #include "core/error/error_macros.h"
-#include "core/math/math_funcs.h"
 #include "core/string/ustring.h"
 #include "vector3simd.h"
 
 struct Basis;
 struct Vector2;
 struct Vector3i;
+struct Vector3SIMD;
 
 struct [[nodiscard]] Vector3 {
     static const int AXIS_COUNT = 3;
@@ -713,7 +714,9 @@ _FORCE_INLINE_ static Vector3 octahedron_decode(const Vector2 &p_oct) {
     // Basis related methods (forward declarations, implemented in basis.h)
     void rotate_fallback(const Vector3& p_axis, real_t p_angle);
     Vector3 rotated_fallback(const Vector3& p_axis, real_t p_angle) const;
-    Basis outer_fallback(const Vector3& p_b) const;
+    
+    //REMOVE ME
+    //Basis outer_fallback(const Vector3& p_b) const;
 
     // Snapping methods
     void snap_fallback(const Vector3& p_step);
