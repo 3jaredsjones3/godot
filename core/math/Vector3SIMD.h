@@ -5,12 +5,12 @@
 #include <cstddef>  // For alignas
 #include <cstdint>
 
-#include "core/typedefs.h"  // This has the real_t definition and _FORCE_INLINE_
 #include "core/math/math_defs.h"
 #include "core/math/math_funcs.h"
+#include "core/typedefs.h"
 #include "vector2.h"
 
-// Forward declarations 
+// Forward declarations
 struct Vector3;
 struct Vector2;
 struct Quaternion;
@@ -23,19 +23,10 @@ struct Quaternion;
 // ... rest of SSE includes
 #endif
 
-// NEON headers 
+// NEON headers
 #if defined(__ARM_NEON) || defined(__aarch64__)
 #define VECTOR3SIMD_USE_NEON
 #include <arm_neon.h>
-#endif
-
-// Define the _FORCE_INLINE_ macro
-#if defined(_MSC_VER)
-#define _FORCE_INLINE_ __forceinline
-#elif defined(__GNUC__) || defined(__clang__)
-#define _FORCE_INLINE_ inline __attribute__((always_inline))
-#else
-#define _FORCE_INLINE_ inline
 #endif
 
 struct Vector3;  // Forward declaration for conversions
@@ -79,7 +70,8 @@ struct alignas(16) Vector3SIMD {
      // Conversion to/from Godot's Vector3
      _FORCE_INLINE_ Vector3SIMD(const Vector3 &p_v) {
 #if defined(VECTOR3SIMD_USE_SSE)
-          m_value = _mm_set_ps(0.0f, p_v.z, p_v.y, p_v.x);
+          m_value =
+              _mm_set_ps(0.0f, p_v.z, p_v.y, p_v.x);  // Corrected arguments
 #elif defined(VECTOR3SIMD_USE_NEON)
           float temp[4] = {p_v.x, p_v.y, p_v.z, 0.0f};
           m_value = vld1q_f32(temp);
@@ -249,7 +241,7 @@ struct alignas(16) Vector3SIMD {
      _FORCE_INLINE_ Vector3SIMD snap_sse(const Vector3SIMD &p_step) {
           // For each component: result = Math::snapped(value, step)
           // snapped = round(value/step) * step
-            Vector3SIMD result = *this;
+          Vector3SIMD result = *this;
           __m128 step = p_step.m_value;
           __m128 div = _mm_div_ps(m_value, step);
           __m128 rounded =
@@ -523,7 +515,6 @@ struct alignas(16) Vector3SIMD {
           _mm_store_ps(r_ptr + 8, result_row3);
      }
 
-
      _FORCE_INLINE_ Vector3SIMD limit_length_sse(float p_len = 1.0f) {
           float l = length_sse();
           if (l > 0.0f && p_len < l) {
@@ -634,15 +625,15 @@ struct alignas(16) Vector3SIMD {
 #if defined(__SSE4_1__)
           return Vector3SIMD(_mm_floor_ps(m_value));
 #else
-     // Fallback for SSE2/3
-     __m128 two_pow_23 = _mm_set1_ps(8388608.0f);
-     __m128 mask = _mm_cmplt_ps(m_value, _mm_setzero_ps());
-     __m128 value_plus = _mm_add_ps(m_value, two_pow_23);
-     __m128 value_minus = _mm_sub_ps(m_value, two_pow_23);
-     __m128 result = _mm_sub_ps(value_plus, two_pow_23);
-     __m128 result_minus = _mm_add_ps(value_minus, two_pow_23);
-     return Vector3SIMD(_mm_or_ps(_mm_and_ps(mask, result_minus),
-                                  _mm_andnot_ps(mask, result)));
+          // Fallback for SSE2/3
+          __m128 two_pow_23 = _mm_set1_ps(8388608.0f);
+          __m128 mask = _mm_cmplt_ps(m_value, _mm_setzero_ps());
+          __m128 value_plus = _mm_add_ps(m_value, two_pow_23);
+          __m128 value_minus = _mm_sub_ps(m_value, two_pow_23);
+          __m128 result = _mm_sub_ps(value_plus, two_pow_23);
+          __m128 result_minus = _mm_add_ps(value_minus, two_pow_23);
+          return Vector3SIMD(_mm_or_ps(_mm_and_ps(mask, result_minus),
+                                       _mm_andnot_ps(mask, result)));
 #endif
      }
 
@@ -650,15 +641,15 @@ struct alignas(16) Vector3SIMD {
 #if defined(__SSE4_1__)
           return Vector3SIMD(_mm_ceil_ps(m_value));
 #else
-     // Fallback for SSE2/3
-     __m128 two_pow_23 = _mm_set1_ps(8388608.0f);
-     __m128 mask = _mm_cmpgt_ps(m_value, _mm_setzero_ps());
-     __m128 value_plus = _mm_add_ps(m_value, two_pow_23);
-     __m128 value_minus = _mm_sub_ps(m_value, two_pow_23);
-     __m128 result = _mm_sub_ps(value_plus, two_pow_23);
-     __m128 result_minus = _mm_add_ps(value_minus, two_pow_23);
-     return Vector3SIMD(_mm_or_ps(_mm_and_ps(mask, result),
-                                  _mm_andnot_ps(mask, result_minus)));
+          // Fallback for SSE2/3
+          __m128 two_pow_23 = _mm_set1_ps(8388608.0f);
+          __m128 mask = _mm_cmpgt_ps(m_value, _mm_setzero_ps());
+          __m128 value_plus = _mm_add_ps(m_value, two_pow_23);
+          __m128 value_minus = _mm_sub_ps(m_value, two_pow_23);
+          __m128 result = _mm_sub_ps(value_plus, two_pow_23);
+          __m128 result_minus = _mm_add_ps(value_minus, two_pow_23);
+          return Vector3SIMD(_mm_or_ps(_mm_and_ps(mask, result),
+                                       _mm_andnot_ps(mask, result_minus)));
 #endif
      }
 
@@ -667,11 +658,11 @@ struct alignas(16) Vector3SIMD {
           return Vector3SIMD(_mm_round_ps(
               m_value, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC));
 #else
-     // Fallback for SSE2/3
-     __m128 sign = _mm_and_ps(m_value, _mm_set1_ps(-0.0f));
-     __m128 magic = _mm_or_ps(_mm_set1_ps(8388608.0f), sign);
-     __m128 result = _mm_sub_ps(_mm_add_ps(m_value, magic), magic);
-     return Vector3SIMD(result);
+          // Fallback for SSE2/3
+          __m128 sign = _mm_and_ps(m_value, _mm_set1_ps(-0.0f));
+          __m128 magic = _mm_or_ps(_mm_set1_ps(8388608.0f), sign);
+          __m128 result = _mm_sub_ps(_mm_add_ps(m_value, magic), magic);
+          return Vector3SIMD(result);
 #endif
      }
 
@@ -733,67 +724,73 @@ struct alignas(16) Vector3SIMD {
                                     _mm_mul_ps(coef4, p_end.m_value))));
      }
 
-_FORCE_INLINE_ Vector2 octahedron_encode_sse() const {
-    // n = v / (|x| + |y| + |z|)
-    __m128 abs_v = _mm_andnot_ps(_mm_set1_ps(-0.0f), m_value);
-    __m128 sum = _mm_add_ps(_mm_add_ps(
-        _mm_shuffle_ps(abs_v, abs_v, _MM_SHUFFLE(0,0,0,0)),
-        _mm_shuffle_ps(abs_v, abs_v, _MM_SHUFFLE(1,1,1,1))),
-        _mm_shuffle_ps(abs_v, abs_v, _MM_SHUFFLE(2,2,2,2)));
-    __m128 n = _mm_div_ps(m_value, sum);
-    
-    // Get components
-    float x = _mm_cvtss_f32(n);
-    float y = _mm_cvtss_f32(_mm_shuffle_ps(n, n, _MM_SHUFFLE(1,1,1,1)));
-    float z = _mm_cvtss_f32(_mm_shuffle_ps(n, n, _MM_SHUFFLE(2,2,2,2)));
-    
-    Vector2 o;
-    if (z >= 0.0f) {
-        o.x = x;
-        o.y = y;
-    } else {
-        o.x = (1.0f - Math::abs(y)) * (x >= 0.0f ? 1.0f : -1.0f);
-        o.y = (1.0f - Math::abs(x)) * (y >= 0.0f ? 1.0f : -1.0f);
-    }
-    
-    // Map to [0,1] range
-    o.x = o.x * 0.5f + 0.5f;
-    o.y = o.y * 0.5f + 0.5f;
-    return o;
-}
+     _FORCE_INLINE_ Vector2 octahedron_encode_sse() const {
+          // n = v / (|x| + |y| + |z|)
+          __m128 abs_v = _mm_andnot_ps(_mm_set1_ps(-0.0f), m_value);
+          __m128 sum = _mm_add_ps(
+              _mm_add_ps(_mm_shuffle_ps(abs_v, abs_v, _MM_SHUFFLE(0, 0, 0, 0)),
+                         _mm_shuffle_ps(abs_v, abs_v, _MM_SHUFFLE(1, 1, 1, 1))),
+              _mm_shuffle_ps(abs_v, abs_v, _MM_SHUFFLE(2, 2, 2, 2)));
+          __m128 n = _mm_div_ps(m_value, sum);
 
-_FORCE_INLINE_ static Vector3SIMD octahedron_decode_sse(const Vector2 &p_oct) {
-    // Map input from [0,1] to [-1,1]
-    __m128 f = _mm_setr_ps(
-        p_oct.x * 2.0f - 1.0f,
-        p_oct.y * 2.0f - 1.0f,
-        0.0f,
-        0.0f
-    );
-    
-    // Calculate z component
-    __m128 abs_x = _mm_andnot_ps(_mm_set1_ps(-0.0f), _mm_shuffle_ps(f, f, _MM_SHUFFLE(0,0,0,0)));
-    __m128 abs_y = _mm_andnot_ps(_mm_set1_ps(-0.0f), _mm_shuffle_ps(f, f, _MM_SHUFFLE(1,1,1,1)));
-    __m128 z = _mm_sub_ps(_mm_set1_ps(1.0f), _mm_add_ps(abs_x, abs_y));
-    
-    // Construct full vector
-    __m128 n = _mm_shuffle_ps(f, z, _MM_SHUFFLE(0,0,1,0));
-    
-    // Handle z correction
-    float z_val = _mm_cvtss_f32(z);
-    float t = std::max(-z_val, 0.0f); //Math:: apparently did not contain max definition
-    
-    // Apply correction
-    __m128 x_sign = _mm_and_ps(_mm_cmpge_ps(n, _mm_setzero_ps()), _mm_set1_ps(1.0f));
-    __m128 correction = _mm_mul_ps(_mm_set1_ps(t), x_sign);
-    n = _mm_add_ps(n, correction);
-    
-    // Normalize
-    __m128 length = _mm_sqrt_ps(_mm_dp_ps(n, n, 0x7F));
-    n = _mm_div_ps(n, length);
-    
-    return Vector3SIMD(n);
-}
+          // Get components
+          float x = _mm_cvtss_f32(n);
+          float y =
+              _mm_cvtss_f32(_mm_shuffle_ps(n, n, _MM_SHUFFLE(1, 1, 1, 1)));
+          float z =
+              _mm_cvtss_f32(_mm_shuffle_ps(n, n, _MM_SHUFFLE(2, 2, 2, 2)));
+
+          Vector2 o;
+          if (z >= 0.0f) {
+               o.x = x;
+               o.y = y;
+          } else {
+               o.x = (1.0f - Math::abs(y)) * (x >= 0.0f ? 1.0f : -1.0f);
+               o.y = (1.0f - Math::abs(x)) * (y >= 0.0f ? 1.0f : -1.0f);
+          }
+
+          // Map to [0,1] range
+          o.x = o.x * 0.5f + 0.5f;
+          o.y = o.y * 0.5f + 0.5f;
+          return o;
+     }
+
+     _FORCE_INLINE_ static Vector3SIMD octahedron_decode_sse(
+         const Vector2 &p_oct) {
+          // Map input from [0,1] to [-1,1]
+          __m128 f = _mm_setr_ps(p_oct.x * 2.0f - 1.0f, p_oct.y * 2.0f - 1.0f,
+                                 0.0f, 0.0f);
+
+          // Calculate z component
+          __m128 abs_x =
+              _mm_andnot_ps(_mm_set1_ps(-0.0f),
+                            _mm_shuffle_ps(f, f, _MM_SHUFFLE(0, 0, 0, 0)));
+          __m128 abs_y =
+              _mm_andnot_ps(_mm_set1_ps(-0.0f),
+                            _mm_shuffle_ps(f, f, _MM_SHUFFLE(1, 1, 1, 1)));
+          __m128 z = _mm_sub_ps(_mm_set1_ps(1.0f), _mm_add_ps(abs_x, abs_y));
+
+          // Construct full vector
+          __m128 n = _mm_shuffle_ps(f, z, _MM_SHUFFLE(0, 0, 1, 0));
+
+          // Handle z correction
+          float z_val = _mm_cvtss_f32(z);
+          float t = std::max(
+              -z_val,
+              0.0f);  // Math:: apparently did not contain max definition
+
+          // Apply correction
+          __m128 x_sign =
+              _mm_and_ps(_mm_cmpge_ps(n, _mm_setzero_ps()), _mm_set1_ps(1.0f));
+          __m128 correction = _mm_mul_ps(_mm_set1_ps(t), x_sign);
+          n = _mm_add_ps(n, correction);
+
+          // Normalize
+          __m128 length = _mm_sqrt_ps(_mm_dp_ps(n, n, 0x7F));
+          n = _mm_div_ps(n, length);
+
+          return Vector3SIMD(n);
+     }
 
 #endif  // endif for VECTOR3SIMD_USE_SSE
 
@@ -1339,71 +1336,61 @@ _FORCE_INLINE_ static Vector3SIMD octahedron_decode_sse(const Vector2 &p_oct) {
           vst1q_f32(r_ptr + 8, result_row3);
      }
 
-_FORCE_INLINE_ Vector2 octahedron_encode_neon() const {
-    // n = v / (|x| + |y| + |z|)
-    float32x4_t abs_v = vabsq_f32(m_value);
-    float sum = vaddvq_f32(abs_v);  // NEON horizontal add
-    float32x4_t n = vdivq_f32(m_value, vdupq_n_f32(sum));
-    
-    // Get components
-    float x = vgetq_lane_f32(n, 0);
-    float y = vgetq_lane_f32(n, 1);
-    float z = vgetq_lane_f32(n, 2);
-    
-    Vector2 o;
-    if (z >= 0.0f) {
-        o.x = x;
-        o.y = y;
-    } else {
-        o.x = (1.0f - Math::abs(y)) * (x >= 0.0f ? 1.0f : -1.0f);
-        o.y = (1.0f - Math::abs(x)) * (y >= 0.0f ? 1.0f : -1.0f);
-    }
-    
-    // Map to [0,1] range
-    o.x = o.x * 0.5f + 0.5f;
-    o.y = o.y * 0.5f + 0.5f;
-    return o;
-}
+     _FORCE_INLINE_ Vector2 octahedron_encode_neon() const {
+          // n = v / (|x| + |y| + |z|)
+          float32x4_t abs_v = vabsq_f32(m_value);
+          float sum = vaddvq_f32(abs_v);  // NEON horizontal add
+          float32x4_t n = vdivq_f32(m_value, vdupq_n_f32(sum));
 
-_FORCE_INLINE_ static Vector3SIMD octahedron_decode_neon(const Vector2 &p_oct) {
-    // Map input from [0,1] to [-1,1]
-    float32x4_t f = {
-        p_oct.x * 2.0f - 1.0f,
-        p_oct.y * 2.0f - 1.0f,
-        0.0f,
-        0.0f
-    };
-    
-    // Calculate z component
-    float32x2_t abs_xy = vabs_f32(vget_low_f32(f));
-    float z = 1.0f - vget_lane_f32(abs_xy, 0) - vget_lane_f32(abs_xy, 1);
-    
-    // Construct full vector
-    float32x4_t n = {
-        vgetq_lane_f32(f, 0),
-        vgetq_lane_f32(f, 1),
-        z,
-        0.0f
-    };
-    
-    // Handle z correction
-    float t = Math::max(-z, 0.0f);
-    
-    // Apply correction using NEON select
-    uint32x4_t x_sign = vcgeq_f32(n, vdupq_n_f32(0.0f));
-    float32x4_t correction = vmulq_n_f32(
-        vreinterpretq_f32_u32(x_sign), 
-        t
-    );
-    n = vaddq_f32(n, correction);
-    
-    // Normalize
-    float32x4_t squared = vmulq_f32(n, n);
-    float length = sqrtf(vaddvq_f32(squared)); // Horizontal add and sqrt
-    n = vdivq_f32(n, vdupq_n_f32(length));
-    
-    return Vector3SIMD(n);
-}
+          // Get components
+          float x = vgetq_lane_f32(n, 0);
+          float y = vgetq_lane_f32(n, 1);
+          float z = vgetq_lane_f32(n, 2);
+
+          Vector2 o;
+          if (z >= 0.0f) {
+               o.x = x;
+               o.y = y;
+          } else {
+               o.x = (1.0f - Math::abs(y)) * (x >= 0.0f ? 1.0f : -1.0f);
+               o.y = (1.0f - Math::abs(x)) * (y >= 0.0f ? 1.0f : -1.0f);
+          }
+
+          // Map to [0,1] range
+          o.x = o.x * 0.5f + 0.5f;
+          o.y = o.y * 0.5f + 0.5f;
+          return o;
+     }
+
+     _FORCE_INLINE_ static Vector3SIMD octahedron_decode_neon(
+         const Vector2 &p_oct) {
+          // Map input from [0,1] to [-1,1]
+          float32x4_t f = {p_oct.x * 2.0f - 1.0f, p_oct.y * 2.0f - 1.0f, 0.0f,
+                           0.0f};
+
+          // Calculate z component
+          float32x2_t abs_xy = vabs_f32(vget_low_f32(f));
+          float z = 1.0f - vget_lane_f32(abs_xy, 0) - vget_lane_f32(abs_xy, 1);
+
+          // Construct full vector
+          float32x4_t n = {vgetq_lane_f32(f, 0), vgetq_lane_f32(f, 1), z, 0.0f};
+
+          // Handle z correction
+          float t = Math::max(-z, 0.0f);
+
+          // Apply correction using NEON select
+          uint32x4_t x_sign = vcgeq_f32(n, vdupq_n_f32(0.0f));
+          float32x4_t correction =
+              vmulq_n_f32(vreinterpretq_f32_u32(x_sign), t);
+          n = vaddq_f32(n, correction);
+
+          // Normalize
+          float32x4_t squared = vmulq_f32(n, n);
+          float length = sqrtf(vaddvq_f32(squared));  // Horizontal add and sqrt
+          n = vdivq_f32(n, vdupq_n_f32(length));
+
+          return Vector3SIMD(n);
+     }
 
 #endif
 
