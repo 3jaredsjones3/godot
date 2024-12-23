@@ -32,6 +32,7 @@ struct [[nodiscard]] Vector3 {
         real_t coord[3];
     };
 
+public:
     // Static constants
     static const Vector3 ZERO;
     static const Vector3 ONE;
@@ -41,6 +42,12 @@ struct [[nodiscard]] Vector3 {
     static const Vector3 DOWN;
     static const Vector3 FORWARD;
     static const Vector3 BACK;
+
+
+    // Basis-related methods - just declarations
+    void rotate(const Vector3& p_axis, real_t p_angle);
+    Vector3 rotated(const Vector3& p_axis, real_t p_angle) const;
+    Vector3 rotated_local(const Vector3& p_axis, real_t p_angle) const;
 
     /**************************************************************************/
     /* Constructors and basic methods */
@@ -849,9 +856,8 @@ private:
    Vector3 floor_fallback() const;
    Vector3 ceil_fallback() const;
    Vector3 round_fallback() const;
-    // Basis-related methods - just declarations
-    void rotate(const Vector3& p_axis, real_t p_angle);
-    Vector3 rotated(const Vector3& p_axis, real_t p_angle) const;
+
+    Vector3 rotated_fallback(const Vector3& p_axis, real_t p_angle) const;
 
 // Clamping and snapping fallbacks
    Vector3 clamp_fallback(const Vector3& p_min, const Vector3& p_max) const;

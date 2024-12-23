@@ -62,19 +62,19 @@ real_t Vector3::length_squared_fallback() const {
      return x * x + y * y + z * z;
 }
 
-Vector3 Vector3::min(const Vector3 &p_vec3) const {
+Vector3 Vector3::min_fallback(const Vector3 &p_vec3) const {
      return Vector3(MIN(x, p_vec3.x), MIN(y, p_vec3.y), MIN(z, p_vec3.z));
 }
 
-Vector3 Vector3::max(const Vector3 &p_vec3) const {
+Vector3 Vector3::max_fallback(const Vector3 &p_vec3) const {
      return Vector3(MAX(x, p_vec3.x), MAX(y, p_vec3.y), MAX(z, p_vec3.z));
 }
 
-Vector3 Vector3::minf(real_t p_scalar) const {
+Vector3 Vector3::minf_fallback(real_t p_scalar) const {
      return Vector3(MIN(x, p_scalar), MIN(y, p_scalar), MIN(z, p_scalar));
 }
 
-Vector3 Vector3::maxf(real_t p_scalar) const {
+Vector3 Vector3::maxf_fallback(real_t p_scalar) const {
      return Vector3(MAX(x, p_scalar), MAX(y, p_scalar), MAX(z, p_scalar));
 }
 
@@ -107,6 +107,34 @@ Vector3 Vector3::rotated(const Vector3& p_axis, real_t p_angle) const {
     Vector3 r = *this;
     r.rotate(p_axis, p_angle);
     return r;
+}
+
+Vector3 Vector3::rotated_local(const Vector3& p_axis, real_t p_angle) const {
+    Vector3 axis = p_axis.normalized();
+    real_t angle = p_angle;
+
+    real_t c = Math::cos(angle);
+    real_t s = Math::sin(angle);
+    real_t C = 1.0f - c;
+
+    real_t xx = axis.x * axis.x;
+    real_t xy = axis.x * axis.y;
+    real_t xz = axis.x * axis.z;
+    real_t yy = axis.y * axis.y;
+    real_t yz = axis.y * axis.z;
+    real_t zz = axis.z * axis.z;
+
+    return Vector3(
+        (xx * C + c) * x + (xy * C - axis.z * s) * y + (xz * C + axis.y * s) * z,
+        (xy * C + axis.z * s) * x + (yy * C + c) * y + (yz * C - axis.x * s) * z,
+        (xz * C - axis.y * s) * x + (yz * C + axis.x * s) * y + (zz * C + c) * z
+    );
+}
+
+Vector3 Vector3::rotated_fallback(const Vector3& p_axis, real_t p_angle) const {
+    Vector3 v = *this;
+    v.rotate(p_axis, p_angle);
+    return v;
 }
 
 Vector2 Vector3::octahedron_encode() const {
