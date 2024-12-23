@@ -199,7 +199,7 @@ bool Face3::intersects_aabb2(const AABB &p_aabb) const {
 		for (int j = 0; j < 3; j++) {
 			Vector3 e2 = edge_norms[j];
 
-			Vector3 axis = vec3_cross(e1, e2);
+			Vector3 axis = Vector3::vec3_cross(e1, e2);
 
 			if (axis.length_squared() < 0.0001f) {
 				continue; // coplanar

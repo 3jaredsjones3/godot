@@ -103,11 +103,32 @@ void Vector3::rotate(const Vector3 &p_axis, real_t p_angle) {
      *this = Basis(p_axis, p_angle).xform(*this);
 }
 
-Vector3 Vector3::rotated(const Vector3 &p_axis, real_t p_angle) const {
-     Vector3 r = *this;
-     r.rotate_fallback(p_axis, p_angle);
-     return r;
+Vector3 Vector3::rotated(const Vector3& p_axis, real_t p_angle) const {
+    Vector3 r = *this;
+    r.rotate(p_axis, p_angle);
+    return r;
 }
+
+Vector2 Vector3::octahedron_encode() const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    return Vector3SIMD(*this).octahedron_encode_sse();
+#elif defined(VECTOR3SIMD_USE_NEON)
+    return Vector3SIMD(*this).octahedron_encode_neon();
+#else
+    return octahedron_encode_fallback();
+#endif
+}
+
+Vector3 Vector3::octahedron_decode(const Vector2& p_oct) {
+#if defined(VECTOR3SIMD_USE_SSE)
+    return Vector3(Vector3SIMD::octahedron_decode_sse(p_oct));
+#elif defined(VECTOR3SIMD_USE_NEON)
+    return Vector3(Vector3SIMD::octahedron_decode_neon(p_oct));
+#else
+    return octahedron_decode_fallback(p_oct);
+#endif
+}
+
 
 Vector3 Vector3::clamp_fallback(const Vector3 &p_min,
                                 const Vector3 &p_max) const {
@@ -173,20 +194,20 @@ Vector3 Vector3::move_toward_fallback(const Vector3 &p_to,
 }
 
 Vector2 Vector3::octahedron_encode_fallback() const {
-     Vector3 n = *this;
-     real_t sum = Math::abs(n.x) + Math::abs(n.y) + Math::abs(n.z);
-     n = n.divide_scalar_fallback(sum);
-     Vector2 o;
-     if (n.z >= 0.0f) {
-          o.x = n.x;
-          o.y = n.y;
-     } else {
-          o.x = (1.0f - Math::abs(n.y)) * (n.x >= 0.0f ? 1.0f : -1.0f);
-          o.y = (1.0f - Math::abs(n.x)) * (n.y >= 0.0f ? 1.0f : -1.0f);
-     }
-     o.x = o.x * 0.5f + 0.5f;
-     o.y = o.y * 0.5f + 0.5f;
-     return o;
+    Vector3 n = *this;
+    real_t sum = Math::abs(n.x) + Math::abs(n.y) + Math::abs(n.z);
+    Vector3 normalized = Vector3(n.x/sum, n.y/sum, n.z/sum);
+    Vector2 o;
+    if (normalized.z >= 0.0f) {
+        o.x = normalized.x;
+        o.y = normalized.y;
+    } else {
+        o.x = (1.0f - Math::abs(normalized.y)) * (normalized.x >= 0.0f ? 1.0f : -1.0f);
+        o.y = (1.0f - Math::abs(normalized.x)) * (normalized.y >= 0.0f ? 1.0f : -1.0f);
+    }
+    o.x = o.x * 0.5f + 0.5f;
+    o.y = o.y * 0.5f + 0.5f;
+    return o;
 }
 
 Vector3 Vector3::octahedron_decode_fallback(const Vector2 &p_oct) {
@@ -198,27 +219,41 @@ Vector3 Vector3::octahedron_decode_fallback(const Vector2 &p_oct) {
      return n.normalized();
 }
 
-Vector2 Vector3::octahedron_tangent_encode(float p_sign) const {
-     const real_t bias = 1.0f / (real_t)32767.0f;
-     Vector2 res = octahedron_encode();
-     res.y = MAX(res.y, bias);
-     res.y = res.y * 0.5f + 0.5f;
-     res.y = p_sign >= 0.0f ? res.y : 1 - res.y;
-     return res;
+Vector2 Vector3::octahedron_tangent_encode(float p_sign) {
+    const real_t bias = 1.0f / (real_t)32767.0f;
+    Vector2 res = this->octahedron_encode();
+    res.y = MAX(res.y, bias);
+    res.y = res.y * 0.5f + 0.5f;
+    res.y = p_sign >= 0.0f ? res.y : 1 - res.y;
+    return res;
 }
 
-Vector3 Vector3::octahedron_tangent_decode(const Vector2 &p_oct,
-                                           float *r_sign) {
-     Vector2 oct_compressed = p_oct;
-     oct_compressed.y = oct_compressed.y * 2 - 1;
-     *r_sign = oct_compressed.y >= 0.0f ? 1.0f : -1.0f;
-     oct_compressed.y = Math::abs(oct_compressed.y);
-     Vector3 res = Vector3::octahedron_decode(oct_compressed);
-     return res;
+Vector3 Vector3::octahedron_tangent_decode(const Vector2& p_oct, float* r_sign) {
+    Vector2 oct_compressed = p_oct;
+    oct_compressed.y = oct_compressed.y * 2 - 1;
+    *r_sign = oct_compressed.y >= 0.0f ? 1.0f : -1.0f;
+    oct_compressed.y = Math::abs(oct_compressed.y);
+    Vector3 res = Vector3::octahedron_decode(oct_compressed);
+    return res;
 }
 
-/*
-We might want to add this at some point but for now I'm not sure it's needed
+Basis Vector3::outer(const Vector3& p_with) const {
+#if defined(VECTOR3SIMD_USE_SSE)
+    float result[12];  // Need space for 3x4 matrix
+    Vector3SIMD(*this).outer_sse(Vector3SIMD(p_with), result);
+    return Basis(Vector3(result[0], result[1], result[2]),
+                Vector3(result[4], result[5], result[6]),
+                Vector3(result[8], result[9], result[10]));
+#elif defined(VECTOR3SIMD_USE_NEON)
+    float result[12];  // Need space for 3x4 matrix
+    Vector3SIMD(*this).outer_neon(Vector3SIMD(p_with), result);
+    return Basis(Vector3(result[0], result[1], result[2]),
+                Vector3(result[4], result[5], result[6]),
+                Vector3(result[8], result[9], result[10]));
+#else
+    return outer_fallback(p_with);
+#endif
+}
 
 Basis Vector3::outer_fallback(const Vector3 &p_with) const {
      Basis basis;
@@ -227,7 +262,6 @@ Basis Vector3::outer_fallback(const Vector3 &p_with) const {
      basis.rows[2] = Vector3(z * p_with.x, z * p_with.y, z * p_with.z);
      return basis;
 }
-*/
 
 void Vector3::normalize_fallback() {
      real_t lengthsq = length_squared_fallback();
@@ -394,7 +428,7 @@ Vector3 Vector3::slerp_fallback(const Vector3 &p_to, real_t p_weight) const {
      real_t result_length =
          Math::lerp(start_length, Math::sqrt(end_length_sq), p_weight);
      real_t angle = angle_to_fallback(p_to);
-     return rotated_fallback(axis, angle * p_weight) *
+     return rotated(axis, angle * p_weight) *
             (result_length / start_length);
 }
 Vector3 Vector3::inverse_fallback() const {

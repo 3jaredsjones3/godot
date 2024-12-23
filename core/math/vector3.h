@@ -1,17 +1,17 @@
 #ifndef VECTOR3_H
 #define VECTOR3_H
 
-#include "core/error/error_macros.h"
-#include "core/math/math_defs.h"
-#include "core/math/math_funcs.h"
-#include "core/string/ustring.h"
-#include "core/typedefs.h"
-
 // Forward declarations
 struct Basis;
 struct Vector2;
 struct Vector3i;
 struct Vector3SIMD;
+
+#include "core/error/error_macros.h"
+#include "core/math/math_defs.h"
+#include "core/math/math_funcs.h"
+#include "core/string/ustring.h"
+#include "core/typedefs.h"
 
 struct [[nodiscard]] Vector3 {
     static const int AXIS_COUNT = 3;
@@ -81,10 +81,19 @@ struct [[nodiscard]] Vector3 {
     /**************************************************************************/
     /* Core vector operations */
     /**************************************************************************/
-    
+
+    // Static cross function
     _FORCE_INLINE_ static Vector3 vec3_cross(const Vector3& a, const Vector3& b) {
         return a.cross(b);
     }
+
+    // Static dot function
+    _FORCE_INLINE_ static real_t vec3_dot(const Vector3& a, const Vector3& b) {
+        return a.dot(b);
+    }
+
+    // Outer product
+    Basis outer(const Vector3& p_with) const;
 
     _FORCE_INLINE_ Vector3 cross(const Vector3& p_with) const {
 #if defined(VECTOR3SIMD_USE_SSE)
@@ -394,19 +403,6 @@ struct [[nodiscard]] Vector3 {
 #endif
    }
 
-/**************************************************************************/
-   /* Rotation operations */
-   /**************************************************************************/
-   void rotate(const Vector3& p_axis, real_t p_angle) {
-       *this = Basis(p_axis, p_angle).xform(*this);
-   }
-
-   Vector3 rotated(const Vector3& p_axis, real_t p_angle) const {
-       Vector3 r = *this;
-       r.rotate(p_axis, p_angle);
-       return r;
-   }
-
    /**************************************************************************/
    /* Snapping operations */
    /**************************************************************************/
@@ -562,29 +558,6 @@ struct [[nodiscard]] Vector3 {
                      Vector3SIMD(p_control_2), Vector3SIMD(p_end), p_t));
 #else
        return bezier_derivative_fallback(p_control_1, p_control_2, p_end, p_t);
-#endif
-   }
-
-   /**************************************************************************/
-   /* Special methods */
-   /**************************************************************************/
-   _FORCE_INLINE_ Vector2 octahedron_encode() const {
-#if defined(VECTOR3SIMD_USE_SSE)
-       return Vector3SIMD(*this).octahedron_encode_sse();
-#elif defined(VECTOR3SIMD_USE_NEON)
-       return Vector3SIMD(*this).octahedron_encode_neon();
-#else
-       return octahedron_encode_fallback();
-#endif
-   }
-
-   _FORCE_INLINE_ static Vector3 octahedron_decode(const Vector2& p_oct) {
-#if defined(VECTOR3SIMD_USE_SSE)
-       return Vector3(Vector3SIMD::octahedron_decode_sse(p_oct));
-#elif defined(VECTOR3SIMD_USE_NEON)
-       return Vector3(Vector3SIMD::octahedron_decode_neon(p_oct));
-#else
-       return octahedron_decode_fallback(p_oct);
 #endif
    }
 
@@ -876,7 +849,9 @@ private:
    Vector3 floor_fallback() const;
    Vector3 ceil_fallback() const;
    Vector3 round_fallback() const;
-   Vector3 rotated_fallback(const Vector3& p_axis, real_t p_angle) const;
+    // Basis-related methods - just declarations
+    void rotate(const Vector3& p_axis, real_t p_angle);
+    Vector3 rotated(const Vector3& p_axis, real_t p_angle) const;
 
 // Clamping and snapping fallbacks
    Vector3 clamp_fallback(const Vector3& p_min, const Vector3& p_max) const;
@@ -891,12 +866,18 @@ private:
    bool is_equal_approx_fallback(const Vector3& p_v) const;
    bool is_zero_approx_fallback() const;
 
-   // Octahedron encoding/decoding fallbacks
-   Vector2 octahedron_encode_fallback() const;
-   static Vector3 octahedron_decode_fallback(const Vector2& p_oct);
+    // Vector2-related methods - just declarations
+    Vector2 octahedron_encode() const;
+    static Vector3 octahedron_decode(const Vector2& p_oct);
+    Vector2 octahedron_tangent_encode(float p_sign);
+    static Vector3 octahedron_tangent_decode(const Vector2& p_oct, float* r_sign);
 
-   Vector2 octahedron_tangent_encode(float p_sign) const;
-   static Vector3 octahedron_tangent_decode(const Vector2& p_oct, float* r_sign);
+    static Vector3 octahedron_decode_fallback(const Vector2 &p_oct);
+    Vector2 octahedron_encode_fallback() const;
+    
+    //Basis-related methods - just declarations
+     Basis outer_fallback(const Vector3& p_with) const;
+
 };
 
 /*********************************************************************************/
@@ -922,6 +903,16 @@ _FORCE_INLINE_ Vector3 operator*(int64_t p_scalar, const Vector3& p_vec) {
 /* Now that Vector3 is fully declared, we can include Vector3SIMD */
 /**********************************************************************************/
 #include "vector3simd.h"
+
+
+// After Vector3 class definition
+_FORCE_INLINE_ Vector3 vec3_cross(const Vector3& a, const Vector3& b) {
+    return Vector3::vec3_cross(a, b);
+}
+
+_FORCE_INLINE_ real_t vec3_dot(const Vector3& a, const Vector3& b) {
+    return Vector3::vec3_dot(a, b);
+}
 
 /**********************************************************************************/
 /* Static constants */
