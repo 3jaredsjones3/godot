@@ -64,6 +64,8 @@ static inline float32x4_t cos_neon(float32x4_t x) {
 }
 #endif
 
+struct Basis;
+
 struct [[nodiscard]] alignas(16) Vector3 {
     static const int AXIS_COUNT = 3;
 
@@ -232,6 +234,9 @@ _FORCE_INLINE_ Vector3(real_t p_x, real_t p_y, real_t p_z, real_t p_w) {
 		return a.dot(b);
 	}
 
+
+    Basis outer(const Vector3& p_with) const;
+
     _FORCE_INLINE_ Vector3 cross(const Vector3& p_with) const {
 #if defined(VECTOR3SIMD_USE_SSE)
           __m128 a = m_value;
@@ -273,47 +278,11 @@ _FORCE_INLINE_ real_t dot(const Vector3& p_with) const {
 #endif
 }
 
-_FORCE_INLINE_ void outer(const Vector3& p_with, Vector3& row1, Vector3& row2, Vector3& row3) const {
-#if defined(VECTOR3SIMD_USE_SSE)
-    // Broadcast components of the current vector
-    __m128 this_x = _mm_set1_ps(x);
-    __m128 this_y = _mm_set1_ps(y);
-    __m128 this_z = _mm_set1_ps(z);
-
-    // Multiply with the components of `p_with` to generate each row
-    __m128 with_vec = p_with.m_value;
-    row1 = Vector3(_mm_mul_ps(this_x, with_vec));
-    row2 = Vector3(_mm_mul_ps(this_y, with_vec));
-    row3 = Vector3(_mm_mul_ps(this_z, with_vec));
-
-#elif defined(VECTOR3SIMD_USE_NEON)
-    // Broadcast components of the current vector
-    float32x4_t this_x = vdupq_n_f32(x);
-    float32x4_t this_y = vdupq_n_f32(y);
-    float32x4_t this_z = vdupq_n_f32(z);
-
-    // Multiply with the components of `p_with` to generate each row
-    float32x4_t with_vec = p_with.m_value;
-    row1 = Vector3(vmulq_f32(this_x, with_vec));
-    row2 = Vector3(vmulq_f32(this_y, with_vec));
-    row3 = Vector3(vmulq_f32(this_z, with_vec));
-
-#else
-    // Fallback scalar implementation
-    row1 = Vector3(x * p_with.x, x * p_with.y, x * p_with.z);
-    row2 = Vector3(y * p_with.x, y * p_with.y, y * p_with.z);
-    row3 = Vector3(z * p_with.x, z * p_with.y, z * p_with.z);
-#endif
-}
-
-
     _FORCE_INLINE_ real_t length() const {
 #if defined(VECTOR3SIMD_USE_SSE)
     return _mm_cvtss_f32(_mm_sqrt_ss(_mm_dp_ps(m_value, m_value, 0x7F)));
-#elif defined(VECTOR3SIMD_USE_NEON)
-    return sqrtf(length_squared_neon()); 
 #else
-     return Math::sqrt(x * x + y * y + z * z);
+    return sqrtf(length_squared()); 
 #endif
     }
 
@@ -321,27 +290,31 @@ _FORCE_INLINE_ void outer(const Vector3& p_with, Vector3& row1, Vector3& row2, V
         return dot(*this); 
     }
 
-_FORCE_INLINE_ Vector3 normalize() const {
+_FORCE_INLINE_ void normalize() {
     real_t l2 = length_squared();
     if (Math::is_zero_approx(l2)) {
-        return Vector3();
+        *this = Vector3();
+        return;
     }
     if (!Math::is_finite(l2) || l2 < 0.0f) {
         ERR_PRINT("Vector3: Invalid length_squared value for normalization");
-        return Vector3();
+        *this = Vector3();
+        return;
     }
     real_t l = Math::sqrt(l2);
 #if defined(VECTOR3SIMD_USE_SSE)
-    return Vector3(_mm_div_ps(m_value, _mm_set1_ps(l)));
+    m_value = _mm_div_ps(m_value, _mm_set1_ps(l));
 #elif defined(VECTOR3SIMD_USE_NEON)
-    return Vector3(vmulq_n_f32(m_value, 1.0f / l));
+    m_value = vmulq_n_f32(m_value, 1.0f / l);
 #else
-    return *this / l;
+    *this /= l;
 #endif
 }
 
     _FORCE_INLINE_ Vector3 normalized() const {
-        return Vector3(*this).normalize();
+        Vector3 norm = *this;
+        norm.normalize();
+        return norm;
     }
 
     _FORCE_INLINE_ bool is_normalized() const {
@@ -464,29 +437,29 @@ _FORCE_INLINE_ Vector3 normalize() const {
 #endif
 }
 
-    _FORCE_INLINE_ Vector3 limit_length_sse(float p_len = 1.0f) {
+_FORCE_INLINE_ Vector3 limit_length(float p_len = 1.0f) {
 #if defined(VECTOR3SIMD_USE_SSE)
-          float l = length();
-          if (l > 0.0f && p_len < l) {
-               return Vector3(_mm_mul_ps(m_value, _mm_set1_ps(p_len / l)));
-          }
-          return *this;
-#elif defined(VECTOR3SIMD_USE_NEON)
-          float l = length();
-          if (l > 0.0f && p_len < l) {
-               return Vector3(vmulq_n_f32(m_value, p_len / l));
-          }
-          return *this;
-#else
-     const real_t l = length_fallback();
-     Vector3 v = *this;
-     if (l > 0 && p_len < l) {
-          v = v.divide_scalar_fallback(l);
-          v = v.multiply_scalar_fallback(p_len);
-     }
-     return v;
-#endif
+    float l = length();
+    if (l > 0.0f && p_len < l) {
+        return (*this * (p_len / l));
     }
+    return *this;
+#elif defined(VECTOR3SIMD_USE_NEON)
+    float l = length();
+    if (l > 0.0f && p_len < l) {
+        return (*this * (p_len / l));
+    }
+    return *this;
+#else
+    const real_t l = length();
+    Vector3 v = *this;
+    if (l > 0 && p_len < l) {
+        v = v / l;
+        v = v * p_len;
+    }
+    return v;
+#endif
+}
 
     _FORCE_INLINE_ Vector3 min(const Vector3& p_v) const {
 #if defined(VECTOR3SIMD_USE_SSE)
@@ -725,7 +698,7 @@ _FORCE_INLINE_ Vector2 octahedron_encode() const {
 #endif
 }
 
-_FORCE_INLINE_ Vector3 octahedron_decode(const Vector2& p_oct) const {
+_FORCE_INLINE_ static Vector3 octahedron_decode(const Vector2& p_oct) {
 #if defined(VECTOR3SIMD_USE_SSE)
     __m128 oct = _mm_set_ps(0.0f, 0.0f, p_oct.y, p_oct.x); // Load Vector2 into SSE register
 
@@ -1406,7 +1379,7 @@ _FORCE_INLINE_ Vector3 bezier_derivative(const Vector3& p_control_1, const Vecto
 
 
 Vector3 vector_divide_neon(Vector3 a, Vector3 b) {
-    #if defined(__ARM_NEON)
+    #if defined(VECTOR3SIMD_USE_NEON)
     uint32x4_t is_zero = vceqq_f32(b.m_value, vdupq_n_f32(0.0f));
     if (vgetq_lane_u32(is_zero, 0) || vgetq_lane_u32(is_zero, 1) || vgetq_lane_u32(is_zero, 2)) {
         ERR_PRINT("Division by zero in vector division");
@@ -1661,19 +1634,23 @@ _FORCE_INLINE_ Vector3 operator-() const {
         return x > p_v.x;
     }
 
-       _FORCE_INLINE_ bool is_equal_approx(const Vector3& p_v) const {
+_FORCE_INLINE_ bool is_equal_approx(const Vector3& p_v) const {
 #if defined(VECTOR3SIMD_USE_SSE)
-            __m128 epsilon = _mm_set1_ps(CMP_EPSILON);
-          __m128 diff = _mm_sub_ps(m_value, p_v.m_value);
-          __m128 abs_diff = _mm_andnot_ps(_mm_set1_ps(-0.0f), diff);
-          __m128 cmp = _mm_cmple_ps(abs_diff, epsilon);
-          return (_mm_movemask_ps(cmp) & 0x7) == 0x7;
+    __m128 epsilon = _mm_set1_ps(CMP_EPSILON);
+    __m128 diff = _mm_sub_ps(m_value, p_v.m_value);
+    __m128 abs_diff = _mm_andnot_ps(_mm_set1_ps(-0.0f), diff);
+    __m128 cmp = _mm_cmple_ps(abs_diff, epsilon);
+    return (_mm_movemask_ps(cmp) & 0x7) == 0x7;
 #elif defined(VECTOR3SIMD_USE_NEON)
-       return Vector3(*this).is_equal_approx_neon(Vector3(p_v));
+    float32x4_t epsilon = vdupq_n_f32(CMP_EPSILON);
+    float32x4_t diff = vsubq_f32(m_value, p_v.m_value);
+    float32x4_t abs_diff = vabsq_f32(diff);
+    uint32x4_t cmp = vcleq_f32(abs_diff, epsilon);
+    return (vgetq_lane_u32(cmp, 0) & vgetq_lane_u32(cmp, 1) & vgetq_lane_u32(cmp, 2)) != 0;
 #else
-       return is_equal_approx_fallback(p_v);
+    return Math::is_equal_approx(x, p_v.x) && Math::is_equal_approx(y, p_v.y) && Math::is_equal_approx(z, p_v.z);
 #endif
-   }
+}
 
    _FORCE_INLINE_ bool is_zero_approx() const {
 #if defined(VECTOR3SIMD_USE_SSE)
@@ -1727,12 +1704,6 @@ _FORCE_INLINE_ Vector3 vec3_cross(const Vector3& a, const Vector3& b) {
 
 _FORCE_INLINE_ real_t vec3_dot(const Vector3& a, const Vector3& b) {
     return Vector3::vec3_dot(a, b);
-}
-
-Vector3::operator Vector3i() const { return Vector3i(x, y, z); }
-
-Vector3::operator String() const {
-    return "(" + String::num_real(x, true) + ", " + String::num_real(y, true) + ", " + String::num_real(z, true) + ")";
 }
 
 /**********************************************************************************/
