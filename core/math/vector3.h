@@ -1,18 +1,6 @@
 #ifndef VECTOR3_H
 #define VECTOR3_H
 
-// SIMD Detection and includes
-#if defined(__SSE__) || (defined(_M_X64) && !defined(__EMSCRIPTEN__))
-#define VECTOR3SIMD_USE_SSE
-#include <emmintrin.h>  // SSE2
-#include <xmmintrin.h>  // SSE
-#endif
-
-#if defined(__ARM_NEON) || defined(__aarch64__)
-#define VECTOR3SIMD_USE_NEON
-#include <arm_neon.h>
-#endif
-
 #include "core/error/error_macros.h"
 #include "core/math/math_defs.h"
 #include "core/math/math_funcs.h"
@@ -21,6 +9,19 @@
 #include "vector2.h"
 #include "core/math/vector3i.h"
 
+const float M_PI = 3.14159265358979323846f;
+
+#if (defined(__SSE__) || (defined(_M_X64) && !defined(__EMSCRIPTEN__))) && !defined(REAL_T_IS_DOUBLE)
+#define VECTOR3SIMD_USE_SSE
+#include <emmintrin.h>  // SSE2
+#include <xmmintrin.h>  // SSE
+#endif
+
+//I'm still working through a lot of bugs for NEON but I will have to set up remote - ssh to test on my device first
+#if defined(__ARM_NEON) || defined(__aarch64__) && !defined(REAL_T_IS_DOUBLE)
+#define VECTOR3SIMD_USE_NEON
+#include <arm_neon.h>
+#endif
 
 #if defined(VECTOR3SIMD_USE_SSE)
 #include <immintrin.h>  // For _mm_sin_ps
@@ -66,7 +67,11 @@ static inline float32x4_t cos_neon(float32x4_t x) {
 
 struct Basis;
 
+#if defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3SIMD_USE_SSE)
 struct [[nodiscard]] alignas(16) Vector3 {
+#else
+struct [[nodiscard]] Vector3 {
+#endif
     static const int AXIS_COUNT = 3;
 
     enum Axis {
@@ -75,6 +80,18 @@ struct [[nodiscard]] alignas(16) Vector3 {
         AXIS_Z,
     };
 
+    // Static constants declarations
+    static const Vector3 ZERO;
+    static const Vector3 ONE;
+    static const Vector3 LEFT;
+    static const Vector3 RIGHT;
+    static const Vector3 UP;
+    static const Vector3 DOWN;
+    static const Vector3 FORWARD;
+    static const Vector3 BACK;
+
+#if defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3SIMD_USE_SSE)
+    // SIMD version
     union {
         struct {
             real_t x;
@@ -90,138 +107,114 @@ struct [[nodiscard]] alignas(16) Vector3 {
         #endif
     };
 
-_FORCE_INLINE_ Vector3(real_t p_x, real_t p_y, real_t p_z, real_t p_w) {
-#if defined(VECTOR3SIMD_USE_SSE)
-    m_value = _mm_set_ps(p_w, p_z, p_y, p_x); // Set 4 elements
-#elif defined(VECTOR3SIMD_USE_NEON)
-    float temp[4] = {p_x, p_y, p_z, p_w};
-    m_value = vld1q_f32(temp);
+    // SIMD constructors
+    _FORCE_INLINE_ Vector3() {
+        #if defined(VECTOR3SIMD_USE_SSE)
+            m_value = _mm_setzero_ps();
+        #elif defined(VECTOR3SIMD_USE_NEON)
+            m_value = vdupq_n_f32(0.0f);
+        #endif
+    }
+
+    _FORCE_INLINE_ Vector3(real_t p_x, real_t p_y, real_t p_z, real_t p_w = 0.0f) {
+        #if defined(VECTOR3SIMD_USE_SSE)
+            m_value = _mm_set_ps(p_w, p_z, p_y, p_x);
+        #elif defined(VECTOR3SIMD_USE_NEON)
+            float temp[4] = {p_x, p_y, p_z, p_w};
+            m_value = vld1q_f32(temp);
+        #endif
+    }
+
+    #if defined(VECTOR3SIMD_USE_SSE)
+    _FORCE_INLINE_ Vector3(__m128 p_val) {
+        m_value = p_val;
+    }
+    #elif defined(VECTOR3SIMD_USE_NEON)
+    _FORCE_INLINE_ Vector3(float32x4_t p_val) {
+        m_value = p_val;
+    }
+    #endif
+
 #else
-    x = p_x;
-    y = p_y;
-    z = p_z;
-    // Ignore p_w in the scalar fallback, as Vector3 doesn't use it
-#endif
-}
+    // Non-SIMD version
+    union {
+        struct {
+            real_t x;
+            real_t y;
+            real_t z;
+        };
+        real_t coord[3];
+    };
 
-
-	/**************************************************************************/
-	/* 1) Copy Constructor                                                    */
-	/**************************************************************************/
-	_FORCE_INLINE_ Vector3(const Vector3 &p_other) {
-#if defined(VECTOR3SIMD_USE_SSE)
-		m_value = p_other.m_value;
-#elif defined(VECTOR3SIMD_USE_NEON)
-		m_value = p_other.m_value;
-#else
-		x = p_other.x;
-		y = p_other.y;
-		z = p_other.z;
-#endif
-	}
-
-	/**************************************************************************/
-	/* 2) Copy Assignment Operator                                            */
-	/**************************************************************************/
-	_FORCE_INLINE_ Vector3 &operator=(const Vector3 &p_other) {
-		if (this == &p_other) {
-			return *this; // Self-assign check
-		}
-#if defined(VECTOR3SIMD_USE_SSE)
-		m_value = p_other.m_value;
-#elif defined(VECTOR3SIMD_USE_NEON)
-		m_value = p_other.m_value;
-#else
-		x = p_other.x;
-		y = p_other.y;
-		z = p_other.z;
-#endif
-		return *this;
-	}
-
-	/**************************************************************************/
-	/* 3) Constructors from SSE/NEON Intrinsics (optional)                    */
-	/**************************************************************************/
-#if defined(VECTOR3SIMD_USE_SSE)
-	_FORCE_INLINE_ Vector3(__m128 p_val) {
-		m_value = p_val;
-	}
-#elif defined(VECTOR3SIMD_USE_NEON)
-	_FORCE_INLINE_ Vector3(float32x4_t p_val) {
-		m_value = p_val;
-	}
+    // Standard constructors
+    _FORCE_INLINE_ Vector3() : x(0), y(0), z(0) {}
+    _FORCE_INLINE_ Vector3(real_t p_x, real_t p_y, real_t p_z) : x(p_x), y(p_y), z(p_z) {}
 #endif
 
-	/**************************************************************************/
-	/* 4) Default Constructor                                                 */
-	/**************************************************************************/
-	_FORCE_INLINE_ Vector3() {
-#if defined(VECTOR3SIMD_USE_SSE)
-		m_value = _mm_setzero_ps();
-#elif defined(VECTOR3SIMD_USE_NEON)
-		m_value = vdupq_n_f32(0.0f);
-#else
-		x = 0;
-		y = 0;
-		z = 0;
-#endif
-	}
+    // Common copy constructor
+    _FORCE_INLINE_ Vector3(const Vector3& p_other) {
+        #if defined(VECTOR3SIMD_USE_SSE)
+            m_value = p_other.m_value;
+        #elif defined(VECTOR3SIMD_USE_NEON)
+            m_value = p_other.m_value;
+        #else
+            x = p_other.x;
+            y = p_other.y;
+            z = p_other.z;
+        #endif
+    }
 
-	/**************************************************************************/
-	/* 5) Constructor (x, y, z)                                              */
-	/**************************************************************************/
-	_FORCE_INLINE_ Vector3(real_t p_x, real_t p_y, real_t p_z) {
-#if defined(VECTOR3SIMD_USE_SSE)
-		m_value = _mm_set_ps(0.0f, p_z, p_y, p_x);
-#elif defined(VECTOR3SIMD_USE_NEON)
-		float temp[4] = {p_x, p_y, p_z, 0.0f};
-		m_value = vld1q_f32(temp);
-#else
-		x = p_x;
-		y = p_y;
-		z = p_z;
-#endif
-	}
+    // Common assignment operator
+    _FORCE_INLINE_ Vector3& operator=(const Vector3& p_other) {
+        if (this == &p_other) return *this;
+        #if defined(VECTOR3SIMD_USE_SSE)
+            m_value = p_other.m_value;
+        #elif defined(VECTOR3SIMD_USE_NEON)
+            m_value = p_other.m_value;
+        #else
+            x = p_other.x;
+            y = p_other.y;
+            z = p_other.z;
+        #endif
+        return *this;
+    }
 
-	/**************************************************************************/
-	/* Axis methods, static constants, etc.                                   */
-	/**************************************************************************/
-	static const Vector3 ZERO;
-	static const Vector3 ONE;
-	static const Vector3 LEFT;
-	static const Vector3 RIGHT;
-	static const Vector3 UP;
-	static const Vector3 DOWN;
-	static const Vector3 FORWARD;
-	static const Vector3 BACK;
+    // Common methods
+    _FORCE_INLINE_ real_t& operator[](int p_axis) {
+        DEV_ASSERT((unsigned int)p_axis < 3);
+        return coord[p_axis];
+    }
 
-	_FORCE_INLINE_ static Vector3 get_zero_vector() {
-		return Vector3();
-	}
+    _FORCE_INLINE_ const real_t& operator[](int p_axis) const {
+        DEV_ASSERT((unsigned int)p_axis < 3);
+        return coord[p_axis];
+    }
 
-	_FORCE_INLINE_ real_t &operator[](int p_axis) {
-		DEV_ASSERT((unsigned int)p_axis < 3);
-		return coord[p_axis];
-	}
+    _FORCE_INLINE_ static Vector3 get_zero_vector() {
+        return Vector3();
+    }
 
-	_FORCE_INLINE_ const real_t &operator[](int p_axis) const {
-		DEV_ASSERT((unsigned int)p_axis < 3);
-		return coord[p_axis];
-	}
+    _FORCE_INLINE_ Axis min_axis_index() const {
+        return (x < y) ? (x < z ? AXIS_X : AXIS_Z) : (y < z ? AXIS_Y : AXIS_Z);
+    }
 
-	_FORCE_INLINE_ Axis min_axis_index() const {
-		return (x < y) ? (x < z ? AXIS_X : AXIS_Z) : (y < z ? AXIS_Y : AXIS_Z);
-	}
+    _FORCE_INLINE_ Axis max_axis_index() const {
+        return (x < y) ? (y < z ? AXIS_Z : AXIS_Y) : (x < z ? AXIS_Z : AXIS_X);
+    }
 
-	_FORCE_INLINE_ Axis max_axis_index() const {
-		return (x < y) ? (y < z ? AXIS_Z : AXIS_Y) : (x < z ? AXIS_Z : AXIS_X);
-	}
+    void zero() {
+        #if defined(VECTOR3SIMD_USE_SSE)
+            m_value = _mm_setzero_ps();
+        #elif defined(VECTOR3SIMD_USE_NEON)
+            m_value = vdupq_n_f32(0.0f);
+        #else
+            x = 0;
+            y = 0;
+            z = 0;
+        #endif
+    }
 
-	void zero() {
-		x = 0;
-		y = 0;
-		z = 0;
-	}
+//methods
 
 	/**************************************************************************/
 	/* Example: Cross & Dot as static methods                                 */
@@ -247,10 +240,10 @@ _FORCE_INLINE_ Vector3(real_t p_x, real_t p_y, real_t p_z, real_t p_w) {
           return Vector3(_mm_shuffle_ps(c, c, _MM_SHUFFLE(3, 0, 2, 1)));
 #elif defined(VECTOR3SIMD_USE_NEON)
         float32x4_t a_yzx = vextq_f32(m_value, m_value, 1);
-        float32x4_t b_yzx = vextq_f32(p_v.m_value, p_v.m_value, 1); // Fixed from p_with
+        float32x4_t b_yzx = vextq_f32(p_with.m_value, p_with.m_value, 1); // Fixed from p_with
         float32x4_t c = vsubq_f32(vmulq_f32(m_value, b_yzx),
                                 vmulq_f32(a_yzx, p_v.m_value));
-        return Vector3SIMD(vextq_f32(c, c, 3));
+        return Vector3(vextq_f32(c, c, 3));
 #else
      return Vector3((y * p_with.z) - (z * p_with.y),
                     (z * p_with.x) - (x * p_with.z),
@@ -539,23 +532,9 @@ _FORCE_INLINE_ Vector3 move_toward(const Vector3& p_to, real_t p_delta) const {
     return diff.length();
     }
 
-_FORCE_INLINE_ real_t distance_squared_to(const Vector3& p_to) const {
-#if defined(VECTOR3SIMD_USE_SSE)
-    __m128 diff = _mm_sub_ps(m_value, p_to.m_value);
-    __m128 squared = _mm_mul_ps(diff, diff);
-    __m128 sum = _mm_hadd_ps(squared, squared); // Sum two pairs
-    sum = _mm_hadd_ps(sum, sum);               // Final sum
-    return _mm_cvtss_f32(sum);
-#elif defined(VECTOR3SIMD_USE_NEON)
-    float32x4_t diff = vsubq_f32(m_value, p_to.m_value);
-    float32x4_t squared = vmulq_f32(diff, diff);
-    float32x2_t pair_sum = vpadd_f32(vget_low_f32(squared), vget_high_f32(squared));
-    return vget_lane_f32(vpadd_f32(pair_sum, pair_sum), 0);
-#else
+_FORCE_INLINE_ real_t distance_squared_to(const Vector3 &p_to) const {
     return (*this - p_to).length_squared();
-#endif
 }
-
 
 _FORCE_INLINE_ Vector3 direction_to(const Vector3& p_to) const {
 #if defined(VECTOR3SIMD_USE_SSE)
@@ -1146,6 +1125,13 @@ _FORCE_INLINE_ void rotate(const Vector3& p_axis, real_t p_angle) {
     m_value = result;
 
 #else
+    real_t xx = axis.x * axis.x;
+    real_t xy = axis.x * axis.y;
+    real_t xz = axis.x * axis.z;
+    real_t yy = axis.y * axis.y;
+    real_t yz = axis.y * axis.z;
+    real_t zz = axis.z * axis.z;
+
     // Scalar fallback remains unchanged
     real_t nx = (xx * k + c) * x + (xy * k - axis.z * s) * y + (xz * k + axis.y * s) * z;
     real_t ny = (xy * k + axis.z * s) * x + (yy * k + c) * y + (yz * k - axis.x * s) * z;
@@ -1635,38 +1621,38 @@ _FORCE_INLINE_ Vector3 operator-() const {
     }
 
 _FORCE_INLINE_ bool is_equal_approx(const Vector3& p_v) const {
-#if defined(VECTOR3SIMD_USE_SSE)
-    __m128 epsilon = _mm_set1_ps(CMP_EPSILON);
-    __m128 diff = _mm_sub_ps(m_value, p_v.m_value);
-    __m128 abs_diff = _mm_andnot_ps(_mm_set1_ps(-0.0f), diff);
-    __m128 cmp = _mm_cmple_ps(abs_diff, epsilon);
-    return (_mm_movemask_ps(cmp) & 0x7) == 0x7;
-#elif defined(VECTOR3SIMD_USE_NEON)
-    float32x4_t epsilon = vdupq_n_f32(CMP_EPSILON);
-    float32x4_t diff = vsubq_f32(m_value, p_v.m_value);
-    float32x4_t abs_diff = vabsq_f32(diff);
-    uint32x4_t cmp = vcleq_f32(abs_diff, epsilon);
-    return (vgetq_lane_u32(cmp, 0) & vgetq_lane_u32(cmp, 1) & vgetq_lane_u32(cmp, 2)) != 0;
-#else
-    return Math::is_equal_approx(x, p_v.x) && Math::is_equal_approx(y, p_v.y) && Math::is_equal_approx(z, p_v.z);
-#endif
+    #if defined(VECTOR3SIMD_USE_SSE)
+        __m128 epsilon = _mm_set1_ps(CMP_EPSILON);
+        __m128 diff = _mm_sub_ps(m_value, p_v.m_value);
+        __m128 abs_diff = _mm_andnot_ps(_mm_set1_ps(-0.0f), diff);
+        __m128 cmp = _mm_cmple_ps(abs_diff, epsilon);
+        return (_mm_movemask_ps(cmp) & 0x7) == 0x7;
+    #elif defined(VECTOR3SIMD_USE_NEON)
+        float32x4_t epsilon = vdupq_n_f32(CMP_EPSILON);
+        float32x4_t diff = vsubq_f32(m_value, p_v.m_value);
+        float32x4_t abs_diff = vabsq_f32(diff);
+        uint32x4_t cmp = vcleq_f32(abs_diff, epsilon);
+        return (vgetq_lane_u32(cmp, 0) & vgetq_lane_u32(cmp, 1) & vgetq_lane_u32(cmp, 2)) != 0;
+    #else
+        return Math::is_equal_approx(x, p_v.x) && Math::is_equal_approx(y, p_v.y) && Math::is_equal_approx(z, p_v.z);
+    #endif
 }
 
    _FORCE_INLINE_ bool is_zero_approx() const {
-#if defined(VECTOR3SIMD_USE_SSE)
+    #if defined(VECTOR3SIMD_USE_SSE)
           __m128 epsilon = _mm_set1_ps(CMP_EPSILON);
           __m128 abs_val = _mm_andnot_ps(_mm_set1_ps(-0.0f), m_value);
           __m128 cmp = _mm_cmple_ps(abs_val, epsilon);
           return (_mm_movemask_ps(cmp) & 0x7) == 0x7;
-#elif defined(VECTOR3SIMD_USE_NEON)
+    #elif defined(VECTOR3SIMD_USE_NEON)
         float32x4_t epsilon = vdupq_n_f32(CMP_EPSILON);
         float32x4_t abs_val = vabsq_f32(m_value);
         uint32x4_t cmp = vcleq_f32(abs_val, epsilon);
         return (vgetq_lane_u32(cmp, 0) & vgetq_lane_u32(cmp, 1) & vgetq_lane_u32(cmp, 2)) != 0;
-#else
+    #else
        return Math::is_zero_approx(x) && Math::is_zero_approx(y) && Math::is_zero_approx(z);
-#endif
-   }
+    #endif
+}
 
    bool is_finite() const {
        return Math::is_finite(x) && Math::is_finite(y) && Math::is_finite(z);
@@ -1677,26 +1663,16 @@ _FORCE_INLINE_ bool is_equal_approx(const Vector3& p_v) const {
    /**************************************************************************/
    operator String() const;
    operator Vector3i() const;
+
 };
 
 /*********************************************************************************/
 /* Global operators */
 /*********************************************************************************/
-_FORCE_INLINE_ Vector3 operator*(float p_scalar, const Vector3& p_vec) {
-   return p_vec * p_scalar;
-}
-
-_FORCE_INLINE_ Vector3 operator*(double p_scalar, const Vector3& p_vec) {
-   return p_vec * p_scalar;
-}
-
-_FORCE_INLINE_ Vector3 operator*(int32_t p_scalar, const Vector3& p_vec) {
-   return p_vec * p_scalar;
-}
-
-_FORCE_INLINE_ Vector3 operator*(int64_t p_scalar, const Vector3& p_vec) {
-   return p_vec * p_scalar;
-}
+_FORCE_INLINE_ Vector3 operator*(float scalar, const Vector3& vec);
+_FORCE_INLINE_ Vector3 operator*(double scalar, const Vector3& vec);
+_FORCE_INLINE_ Vector3 operator*(int32_t scalar, const Vector3& vec);
+_FORCE_INLINE_ Vector3 operator*(int64_t scalar, const Vector3& vec);
 
 _FORCE_INLINE_ Vector3 vec3_cross(const Vector3& a, const Vector3& b) {
     return Vector3::vec3_cross(a, b);
@@ -1709,14 +1685,5 @@ _FORCE_INLINE_ real_t vec3_dot(const Vector3& a, const Vector3& b) {
 /**********************************************************************************/
 /* Static constants */
 /**********************************************************************************/
-// Note: These were causing compilation errors in the class, so defining them here
-inline const Vector3 Vector3::ZERO = Vector3(0, 0, 0);
-inline const Vector3 Vector3::ONE = Vector3(1, 1, 1);
-inline const Vector3 Vector3::LEFT = Vector3(-1, 0, 0);
-inline const Vector3 Vector3::RIGHT = Vector3(1, 0, 0);
-inline const Vector3 Vector3::UP = Vector3(0, 1, 0);
-inline const Vector3 Vector3::DOWN = Vector3(0, -1, 0);
-inline const Vector3 Vector3::FORWARD = Vector3(0, 0, 1);
-inline const Vector3 Vector3::BACK = Vector3(0, 0, -1);
 
 #endif // VECTOR3_H

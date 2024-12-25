@@ -1,11 +1,12 @@
 #include "vector4.h"
 #include "core/string/ustring.h"  // For String class
 #include "vector4i.h"            // For Vector4i class
-
+#include <cstdio> // for snprintf
 
 Vector4::operator String() const {
-    return String("{x: ") + String::num(x) + ", y: " + String::num(y) +
-           ", z: " + String::num(z) + ", w: " + String::num(w) + "}";
+    char buffer[128];
+    snprintf(buffer, sizeof(buffer), "(%f, %f, %f, %f)", x, y, z, w);
+    return String(buffer);
 }
 
 Vector4::operator Vector4i() const {

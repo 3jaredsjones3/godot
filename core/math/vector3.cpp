@@ -1,12 +1,15 @@
 #include "core/math/vector3.h"
 #include "core/math/basis.h"
+#include <cstdio> // for snprintf
 
 Vector3::operator Vector3i() const { 
     return Vector3i(x, y, z); 
 }
 
 Vector3::operator String() const {
-    return "(" + String::num_real(x, true) + ", " + String::num_real(y, true) + ", " + String::num_real(z, true) + ")";
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "(%f, %f, %f)", x, y, z);
+    return String(buffer);
 }
 
 Basis Vector3::outer(const Vector3& p_with) const {
@@ -40,3 +43,29 @@ Basis Vector3::outer(const Vector3& p_with) const {
     );
 #endif
 }
+
+// Global operator* implementations
+_FORCE_INLINE_ Vector3 operator*(float scalar, const Vector3& vec) {
+    return vec * scalar; // Uses member operator*
+}
+
+_FORCE_INLINE_ Vector3 operator*(double scalar, const Vector3& vec) {
+    return vec * static_cast<real_t>(scalar); // Ensure type consistency
+}
+
+_FORCE_INLINE_ Vector3 operator*(int32_t scalar, const Vector3& vec) {
+    return vec * static_cast<real_t>(scalar);
+}
+
+_FORCE_INLINE_ Vector3 operator*(int64_t scalar, const Vector3& vec) {
+    return vec * static_cast<real_t>(scalar);
+}
+
+const Vector3 Vector3::ZERO = Vector3(0.0f, 0.0f, 0.0f);
+const Vector3 Vector3::ONE = Vector3(1.0f, 1.0f, 1.0f);
+const Vector3 Vector3::LEFT = Vector3(-1.0f, 0.0f, 0.0f);
+const Vector3 Vector3::RIGHT = Vector3(1.0f, 0.0f, 0.0f);
+const Vector3 Vector3::UP = Vector3(0.0f, 1.0f, 0.0f);
+const Vector3 Vector3::DOWN = Vector3(0.0f, -1.0f, 0.0f);
+const Vector3 Vector3::FORWARD = Vector3(0.0f, 0.0f, 1.0f);
+const Vector3 Vector3::BACK = Vector3(0.0f, 0.0f, -1.0f);
