@@ -627,7 +627,8 @@ Error ResourceLoaderBinary::parse_variant(Variant &r_v) {
 			Vector<Vector3> array;
 			array.resize(len);
 			Vector3 *w = array.ptrw();
-			static_assert(sizeof(Vector3) == 3 * sizeof(real_t));
+			static_assert(sizeof(Vector3) == alignof(Vector3) * ((3 * sizeof(real_t) + alignof(Vector3) - 1) / alignof(Vector3)), 
+              "Vector3 size does not match 3 * sizeof(real_t) since we have simd alignment");
 			const Error err = read_reals(reinterpret_cast<real_t *>(w), f, len * 3);
 			ERR_FAIL_COND_V(err != OK, err);
 

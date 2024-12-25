@@ -27,6 +27,9 @@
 
 #include <cmath>
 
+class String;
+struct Vector4i;
+
 struct [[nodiscard]] alignas(16) Vector4 {
     static const int AXIS_COUNT = 4;
 
@@ -163,6 +166,117 @@ struct [[nodiscard]] alignas(16) Vector4 {
         return Vector4(x / p_scalar, y / p_scalar, z / p_scalar, w / p_scalar);
 #endif
     }
+
+    _FORCE_INLINE_ Vector4 &operator+=(const Vector4 &p_vec4) {
+#if defined(VECTOR4_USE_SSE)
+        m_value = _mm_add_ps(m_value, p_vec4.m_value);
+#elif defined(VECTOR4_USE_NEON)
+        m_value = vaddq_f32(m_value, p_vec4.m_value);
+#else
+        x += p_vec4.x;
+        y += p_vec4.y;
+        z += p_vec4.z;
+        w += p_vec4.w;
+#endif
+        return *this;
+    }
+
+    _FORCE_INLINE_ Vector4 &operator-=(const Vector4 &p_vec4) {
+#if defined(VECTOR4_USE_SSE)
+        m_value = _mm_sub_ps(m_value, p_vec4.m_value);
+#elif defined(VECTOR4_USE_NEON)
+        m_value = vsubq_f32(m_value, p_vec4.m_value);
+#else
+        x -= p_vec4.x;
+        y -= p_vec4.y;
+        z -= p_vec4.z;
+        w -= p_vec4.w;
+#endif
+        return *this;
+    }
+
+    _FORCE_INLINE_ Vector4 &operator*=(real_t p_scalar) {
+#if defined(VECTOR4_USE_SSE)
+        __m128 scalar = _mm_set1_ps(p_scalar);
+        m_value = _mm_mul_ps(m_value, scalar);
+#elif defined(VECTOR4_USE_NEON)
+        m_value = vmulq_n_f32(m_value, p_scalar);
+#else
+        x *= p_scalar;
+        y *= p_scalar;
+        z *= p_scalar;
+        w *= p_scalar;
+#endif
+        return *this;
+    }
+
+    _FORCE_INLINE_ Vector4 &operator/=(real_t p_scalar) {
+#if defined(VECTOR4_USE_SSE)
+        __m128 scalar = _mm_set1_ps(p_scalar);
+        m_value = _mm_div_ps(m_value, scalar);
+#elif defined(VECTOR4_USE_NEON)
+        m_value = vdivq_f32(m_value, vdupq_n_f32(p_scalar));
+#else
+        x /= p_scalar;
+        y /= p_scalar;
+        z /= p_scalar;
+        w /= p_scalar;
+#endif
+        return *this;
+    }
+
+    _FORCE_INLINE_ Vector4 operator-() const {
+#if defined(VECTOR4_USE_SSE)
+        __m128 neg = _mm_set1_ps(-1.0f);
+        return Vector4(_mm_mul_ps(m_value, neg));
+#elif defined(VECTOR4_USE_NEON)
+        return Vector4(vnegq_f32(m_value));
+#else
+        return Vector4(-x, -y, -z, -w);
+#endif
+    }
+
+_FORCE_INLINE_ Vector4 operator+(const Vector4 &p_vec4) const {
+#if defined(VECTOR4_USE_SSE)
+    return Vector4(_mm_add_ps(m_value, p_vec4.m_value));
+#elif defined(VECTOR4_USE_NEON)
+    return Vector4(vaddq_f32(m_value, p_vec4.m_value));
+#else
+    return Vector4(x + p_vec4.x, y + p_vec4.y, z + p_vec4.z, w + p_vec4.w);
+#endif
+}
+
+_FORCE_INLINE_ Vector4 operator-(const Vector4 &p_vec4) const {
+#if defined(VECTOR4_USE_SSE)
+    return Vector4(_mm_sub_ps(m_value, p_vec4.m_value));
+#elif defined(VECTOR4_USE_NEON)
+    return Vector4(vsubq_f32(m_value, p_vec4.m_value));
+#else
+    return Vector4(x - p_vec4.x, y - p_vec4.y, z - p_vec4.z, w - p_vec4.w);
+#endif
+}
+
+_FORCE_INLINE_ Vector4 operator*(real_t p_scalar) const {
+#if defined(VECTOR4_USE_SSE)
+    __m128 scalar = _mm_set1_ps(p_scalar);
+    return Vector4(_mm_mul_ps(m_value, scalar));
+#elif defined(VECTOR4_USE_NEON)
+    return Vector4(vmulq_n_f32(m_value, p_scalar));
+#else
+    return Vector4(x * p_scalar, y * p_scalar, z * p_scalar, w * p_scalar);
+#endif
+}
+
+_FORCE_INLINE_ Vector4 operator/(real_t p_scalar) const {
+#if defined(VECTOR4_USE_SSE)
+    __m128 scalar = _mm_set1_ps(p_scalar);
+    return Vector4(_mm_div_ps(m_value, scalar));
+#elif defined(VECTOR4_USE_NEON)
+    return Vector4(vdivq_f32(m_value, vdupq_n_f32(p_scalar)));
+#else
+    return Vector4(x / p_scalar, y / p_scalar, z / p_scalar, w / p_scalar);
+#endif
+}
 
     _FORCE_INLINE_ Vector4 abs() const {
 #if defined(VECTOR4_USE_SSE)
@@ -527,74 +641,247 @@ struct [[nodiscard]] alignas(16) Vector4 {
         return !(*this == p_vec4);
     }
 
-    _FORCE_INLINE_ Vector4 &operator+=(const Vector4 &p_vec4) {
+_FORCE_INLINE_ bool operator<(const Vector4 &other) const {
 #if defined(VECTOR4_USE_SSE)
-        m_value = _mm_add_ps(m_value, p_vec4.m_value);
+    __m128 lhs = _mm_set_ps(w, z, y, x);
+    __m128 rhs = _mm_set_ps(other.w, other.z, other.y, other.x);
+    __m128 cmp = _mm_cmplt_ps(lhs, rhs);
+    return _mm_movemask_ps(cmp) == 0xF; // All 4 comparisons must be true
 #elif defined(VECTOR4_USE_NEON)
-        m_value = vaddq_f32(m_value, p_vec4.m_value);
+    float32x4_t lhs = vld1q_f32(coord);
+    float32x4_t rhs = vld1q_f32(other.coord);
+    uint32x4_t cmp = vcltq_f32(lhs, rhs);
+    return vgetq_lane_u32(cmp, 0) && vgetq_lane_u32(cmp, 1) && 
+           vgetq_lane_u32(cmp, 2) && vgetq_lane_u32(cmp, 3);
 #else
-        x += p_vec4.x;
-        y += p_vec4.y;
-        z += p_vec4.z;
-        w += p_vec4.w;
+    return x < other.x && y < other.y && z < other.z && w < other.w;
 #endif
-        return *this;
-    }
+}
 
-    _FORCE_INLINE_ Vector4 &operator-=(const Vector4 &p_vec4) {
+_FORCE_INLINE_ bool operator<=(const Vector4 &other) const {
 #if defined(VECTOR4_USE_SSE)
-        m_value = _mm_sub_ps(m_value, p_vec4.m_value);
+    __m128 lhs = _mm_set_ps(w, z, y, x);
+    __m128 rhs = _mm_set_ps(other.w, other.z, other.y, other.x);
+    __m128 cmp = _mm_cmple_ps(lhs, rhs);
+    return _mm_movemask_ps(cmp) == 0xF; // All 4 comparisons must be true
 #elif defined(VECTOR4_USE_NEON)
-        m_value = vsubq_f32(m_value, p_vec4.m_value);
+    float32x4_t lhs = vld1q_f32(coord);
+    float32x4_t rhs = vld1q_f32(other.coord);
+    uint32x4_t cmp = vcleq_f32(lhs, rhs);
+    return vgetq_lane_u32(cmp, 0) && vgetq_lane_u32(cmp, 1) && 
+           vgetq_lane_u32(cmp, 2) && vgetq_lane_u32(cmp, 3);
 #else
-        x -= p_vec4.x;
-        y -= p_vec4.y;
-        z -= p_vec4.z;
-        w -= p_vec4.w;
+    return x <= other.x && y <= other.y && z <= other.z && w <= other.w;
 #endif
-        return *this;
-    }
+}
 
-    _FORCE_INLINE_ Vector4 &operator*=(real_t p_scalar) {
+_FORCE_INLINE_ bool operator>(const Vector4 &other) const {
 #if defined(VECTOR4_USE_SSE)
-        __m128 scalar = _mm_set1_ps(p_scalar);
-        m_value = _mm_mul_ps(m_value, scalar);
+    __m128 lhs = _mm_set_ps(w, z, y, x);
+    __m128 rhs = _mm_set_ps(other.w, other.z, other.y, other.x);
+    __m128 cmp = _mm_cmpgt_ps(lhs, rhs);
+    return _mm_movemask_ps(cmp) == 0xF; // All 4 comparisons must be true
 #elif defined(VECTOR4_USE_NEON)
-        m_value = vmulq_n_f32(m_value, p_scalar);
+    float32x4_t lhs = vld1q_f32(coord);
+    float32x4_t rhs = vld1q_f32(other.coord);
+    uint32x4_t cmp = vcgtq_f32(lhs, rhs);
+    return vgetq_lane_u32(cmp, 0) && vgetq_lane_u32(cmp, 1) && 
+           vgetq_lane_u32(cmp, 2) && vgetq_lane_u32(cmp, 3);
 #else
-        x *= p_scalar;
-        y *= p_scalar;
-        z *= p_scalar;
-        w *= p_scalar;
+    return x > other.x && y > other.y && z > other.z && w > other.w;
 #endif
-        return *this;
-    }
+}
 
-    _FORCE_INLINE_ Vector4 &operator/=(real_t p_scalar) {
+_FORCE_INLINE_ bool operator>=(const Vector4 &other) const {
 #if defined(VECTOR4_USE_SSE)
-        __m128 scalar = _mm_set1_ps(p_scalar);
-        m_value = _mm_div_ps(m_value, scalar);
+    __m128 lhs = _mm_set_ps(w, z, y, x);
+    __m128 rhs = _mm_set_ps(other.w, other.z, other.y, other.x);
+    __m128 cmp = _mm_cmpge_ps(lhs, rhs);
+    return _mm_movemask_ps(cmp) == 0xF; // All 4 comparisons must be true
 #elif defined(VECTOR4_USE_NEON)
-        m_value = vdivq_f32(m_value, vdupq_n_f32(p_scalar));
+    float32x4_t lhs = vld1q_f32(coord);
+    float32x4_t rhs = vld1q_f32(other.coord);
+    uint32x4_t cmp = vcgeq_f32(lhs, rhs);
+    return vgetq_lane_u32(cmp, 0) && vgetq_lane_u32(cmp, 1) && 
+           vgetq_lane_u32(cmp, 2) && vgetq_lane_u32(cmp, 3);
 #else
-        x /= p_scalar;
-        y /= p_scalar;
-        z /= p_scalar;
-        w /= p_scalar;
+    return x >= other.x && y >= other.y && z >= other.z && w >= other.w;
 #endif
-        return *this;
-    }
+}
 
-    _FORCE_INLINE_ Vector4 operator-() const {
+_FORCE_INLINE_ bool Vector4::operator<(const Vector4 &p_vec4) const {
 #if defined(VECTOR4_USE_SSE)
-        __m128 neg = _mm_set1_ps(-1.0f);
-        return Vector4(_mm_mul_ps(m_value, neg));
+    __m128 lhs = _mm_set_ps(w, z, y, x);
+    __m128 rhs = _mm_set_ps(p_vec4.w, p_vec4.z, p_vec4.y, p_vec4.x);
+    __m128 cmp = _mm_cmplt_ps(lhs, rhs);
+    // Check if all components are true
+    return _mm_movemask_ps(cmp) == 0xF; // All bits must be set
 #elif defined(VECTOR4_USE_NEON)
-        return Vector4(vnegq_f32(m_value));
+    float32x4_t lhs = vld1q_f32(coord);
+    float32x4_t rhs = vld1q_f32(p_vec4.coord);
+    uint32x4_t cmp = vcltq_f32(lhs, rhs);
+    return vgetq_lane_u32(cmp, 0) && vgetq_lane_u32(cmp, 1) && 
+           vgetq_lane_u32(cmp, 2) && vgetq_lane_u32(cmp, 3);
 #else
-        return Vector4(-x, -y, -z, -w);
+    // Scalar fallback
+    return x < p_vec4.x && y < p_vec4.y && z < p_vec4.z && w < p_vec4.w;
 #endif
+}
+
+_FORCE_INLINE_ bool Vector4::operator>(const Vector4 &p_vec4) const {
+#if defined(VECTOR4_USE_SSE)
+    __m128 lhs = _mm_set_ps(w, z, y, x);
+    __m128 rhs = _mm_set_ps(p_vec4.w, p_vec4.z, p_vec4.y, p_vec4.x);
+    __m128 cmp = _mm_cmpgt_ps(lhs, rhs);
+    // Check if all components are true
+    return _mm_movemask_ps(cmp) == 0xF; // All bits must be set
+#elif defined(VECTOR4_USE_NEON)
+    float32x4_t lhs = vld1q_f32(coord);
+    float32x4_t rhs = vld1q_f32(p_vec4.coord);
+    uint32x4_t cmp = vcgtq_f32(lhs, rhs);
+    return vgetq_lane_u32(cmp, 0) && vgetq_lane_u32(cmp, 1) && 
+           vgetq_lane_u32(cmp, 2) && vgetq_lane_u32(cmp, 3);
+#else
+    // Scalar fallback
+    return x > p_vec4.x && y > p_vec4.y && z > p_vec4.z && w > p_vec4.w;
+#endif
+}
+
+_FORCE_INLINE_ bool Vector4::operator<=(const Vector4 &p_vec4) const {
+#if defined(VECTOR4_USE_SSE)
+    __m128 lhs = _mm_set_ps(w, z, y, x);
+    __m128 rhs = _mm_set_ps(p_vec4.w, p_vec4.z, p_vec4.y, p_vec4.x);
+    __m128 cmp = _mm_cmple_ps(lhs, rhs);
+    // Check if all components are true
+    return _mm_movemask_ps(cmp) == 0xF; // All bits must be set
+#elif defined(VECTOR4_USE_NEON)
+    float32x4_t lhs = vld1q_f32(coord);
+    float32x4_t rhs = vld1q_f32(p_vec4.coord);
+    uint32x4_t cmp = vcleq_f32(lhs, rhs);
+    return vgetq_lane_u32(cmp, 0) && vgetq_lane_u32(cmp, 1) && 
+           vgetq_lane_u32(cmp, 2) && vgetq_lane_u32(cmp, 3);
+#else
+    // Scalar fallback
+    return x <= p_vec4.x && y <= p_vec4.y && z <= p_vec4.z && w <= p_vec4.w;
+#endif
+}
+
+_FORCE_INLINE_ bool Vector4::operator>=(const Vector4 &p_vec4) const {
+#if defined(VECTOR4_USE_SSE)
+    __m128 lhs = _mm_set_ps(w, z, y, x);
+    __m128 rhs = _mm_set_ps(p_vec4.w, p_vec4.z, p_vec4.y, p_vec4.x);
+    __m128 cmp = _mm_cmpge_ps(lhs, rhs);
+    // Check if all components are true
+    return _mm_movemask_ps(cmp) == 0xF; // All bits must be set
+#elif defined(VECTOR4_USE_NEON)
+    float32x4_t lhs = vld1q_f32(coord);
+    float32x4_t rhs = vld1q_f32(p_vec4.coord);
+    uint32x4_t cmp = vcgeq_f32(lhs, rhs);
+    return vgetq_lane_u32(cmp, 0) && vgetq_lane_u32(cmp, 1) && 
+           vgetq_lane_u32(cmp, 2) && vgetq_lane_u32(cmp, 3);
+#else
+    // Scalar fallback
+    return x >= p_vec4.x && y >= p_vec4.y && z >= p_vec4.z && w >= p_vec4.w;
+#endif
+}
+
+Vector4::Axis Vector4::min_axis_index() const {
+#if defined(VECTOR4_USE_SSE)
+    // Load values into an SSE register
+    __m128 values = _mm_set_ps(w, z, y, x);
+    // Shuffle and find the minimum value
+    __m128 temp1 = _mm_shuffle_ps(values, values, _MM_SHUFFLE(1, 0, 3, 2));
+    __m128 min1 = _mm_min_ps(values, temp1);
+    __m128 temp2 = _mm_shuffle_ps(min1, min1, _MM_SHUFFLE(2, 3, 0, 1));
+    __m128 min2 = _mm_min_ps(min1, temp2);
+
+    // Extract the minimum value
+    float min_value = _mm_cvtss_f32(min2);
+
+    // Find the index of the minimum value
+    for (int i = 0; i < 4; i++) {
+        if (coord[i] == min_value) {
+            return static_cast<Vector4::Axis>(i);
+        }
     }
+    return AXIS_X; // Fallback, should never reach
+#elif defined(VECTOR4_USE_NEON)
+    // Load values into a NEON register
+    float32x4_t values = vld1q_f32(coord);
+    // Find the minimum value
+    float32x2_t min1 = vpmin_f32(vget_low_f32(values), vget_high_f32(values));
+    float32x2_t min2 = vpmin_f32(min1, min1);
+    float min_value = vget_lane_f32(min2, 0);
+
+    // Find the index of the minimum value
+    for (int i = 0; i < 4; i++) {
+        if (coord[i] == min_value) {
+            return static_cast<Vector4::Axis>(i);
+        }
+    }
+    return AXIS_X; // Fallback, should never reach
+#else
+    // Scalar fallback
+    uint32_t min_index = 0;
+    real_t min_value = x;
+    for (uint32_t i = 1; i < 4; i++) {
+        if (coord[i] < min_value) {
+            min_index = i;
+            min_value = coord[i];
+        }
+    }
+    return static_cast<Vector4::Axis>(min_index);
+#endif
+}
+
+Vector4::Axis Vector4::max_axis_index() const {
+#if defined(VECTOR4_USE_SSE)
+    // Load values into an SSE register
+    __m128 values = _mm_set_ps(w, z, y, x);
+    // Shuffle and find the maximum value
+    __m128 temp1 = _mm_shuffle_ps(values, values, _MM_SHUFFLE(1, 0, 3, 2));
+    __m128 max1 = _mm_max_ps(values, temp1);
+    __m128 temp2 = _mm_shuffle_ps(max1, max1, _MM_SHUFFLE(2, 3, 0, 1));
+    __m128 max2 = _mm_max_ps(max1, temp2);
+
+    // Extract the maximum value
+    float max_value = _mm_cvtss_f32(max2);
+
+    // Find the index of the maximum value
+    for (int i = 0; i < 4; i++) {
+        if (coord[i] == max_value) {
+            return static_cast<Vector4::Axis>(i);
+        }
+    }
+    return AXIS_X; // Fallback, should never reach
+#elif defined(VECTOR4_USE_NEON)
+    // Load values into a NEON register
+    float32x4_t values = vld1q_f32(coord);
+    // Find the maximum value
+    float32x2_t max1 = vpmax_f32(vget_low_f32(values), vget_high_f32(values));
+    float32x2_t max2 = vpmax_f32(max1, max1);
+    float max_value = vget_lane_f32(max2, 0);
+
+    // Find the index of the maximum value
+    for (int i = 0; i < 4; i++) {
+        if (coord[i] == max_value) {
+            return static_cast<Vector4::Axis>(i);
+        }
+    }
+    return AXIS_X; // Fallback, should never reach
+#else
+    // Scalar fallback
+    uint32_t max_index = 0;
+    real_t max_value = x;
+    for (uint32_t i = 1; i < 4; i++) {
+        if (coord[i] > max_value) {
+            max_index = i;
+            max_value = coord[i];
+        }
+    }
+    return static_cast<Vector4::Axis>(max_index);
+#endif
+}
 
 
     _FORCE_INLINE_ Vector4 round() const {
@@ -626,99 +913,267 @@ struct [[nodiscard]] alignas(16) Vector4 {
 #endif
     }
 
-    // --- Restore cubic_interpolate_in_time() ---
-    _FORCE_INLINE_ Vector4 cubic_interpolate_in_time(
-        const Vector4 &p_b,
-        const Vector4 &p_pre_a,
-        const Vector4 &p_post_b,
-        real_t p_weight,
-        real_t p_b_t,
-        real_t p_pre_a_t,
-        real_t p_post_b_t
-    ) const {
+_FORCE_INLINE_ bool is_equal_approx(const Vector4 &p_vec4) const {
 #if defined(VECTOR4_USE_SSE)
-        // We'll load our 4D vectors into SSE registers:
-        __m128 v_this   = m_value;
-        __m128 v_b      = p_b.m_value;
-        __m128 v_pre_a  = p_pre_a.m_value;
-        __m128 v_post_b = p_post_b.m_value;
+    __m128 lhs = _mm_set_ps(w, z, y, x);
+    __m128 rhs = _mm_set_ps(p_vec4.w, p_vec4.z, p_vec4.y, p_vec4.x);
+    __m128 diff = _mm_sub_ps(lhs, rhs);
+    __m128 abs_diff = _mm_andnot_ps(_mm_set1_ps(-0.0f), diff); // Absolute value
+    __m128 epsilon = _mm_set1_ps(CMP_EPSILON); // Approximation threshold
+    __m128 cmp = _mm_cmple_ps(abs_diff, epsilon);
+    return _mm_movemask_ps(cmp) == 0xF; // All components are approximately equal
+#elif defined(VECTOR4_USE_NEON)
+    float32x4_t lhs = vld1q_f32(coord);
+    float32x4_t rhs = vld1q_f32(p_vec4.coord);
+    float32x4_t diff = vsubq_f32(lhs, rhs);
+    float32x4_t abs_diff = vabsq_f32(diff);
+    float32x4_t epsilon = vdupq_n_f32(CMP_EPSILON);
+    uint32x4_t cmp = vcleq_f32(abs_diff, epsilon);
+    return vgetq_lane_u32(cmp, 0) && vgetq_lane_u32(cmp, 1) &&
+           vgetq_lane_u32(cmp, 2) && vgetq_lane_u32(cmp, 3);
+#else
+    // Scalar fallback
+    return Math::is_equal_approx(x, p_vec4.x) &&
+           Math::is_equal_approx(y, p_vec4.y) &&
+           Math::is_equal_approx(z, p_vec4.z) &&
+           Math::is_equal_approx(w, p_vec4.w);
+#endif
+}
 
-        // Broadcast single floats
-        __m128 w_val        = _mm_set1_ps(p_weight);
-        __m128 pre_a_t_val  = _mm_set1_ps(p_pre_a_t);
-        __m128 b_t_val      = _mm_set1_ps(p_b_t);
-        __m128 post_b_t_val = _mm_set1_ps(p_post_b_t);
+_FORCE_INLINE_ bool is_zero_approx() const {
+#if defined(VECTOR4_USE_SSE)
+    __m128 values = _mm_set_ps(w, z, y, x);
+    __m128 abs_values = _mm_andnot_ps(_mm_set1_ps(-0.0f), values); // Absolute value
+    __m128 epsilon = _mm_set1_ps(CMP_EPSILON); // Approximation threshold
+    __m128 cmp = _mm_cmple_ps(abs_values, epsilon);
+    return _mm_movemask_ps(cmp) == 0xF; // All components are approximately zero
+#elif defined(VECTOR4_USE_NEON)
+    float32x4_t values = vld1q_f32(coord);
+    float32x4_t abs_values = vabsq_f32(values);
+    float32x4_t epsilon = vdupq_n_f32(CMP_EPSILON);
+    uint32x4_t cmp = vcleq_f32(abs_values, epsilon);
+    return vgetq_lane_u32(cmp, 0) && vgetq_lane_u32(cmp, 1) &&
+           vgetq_lane_u32(cmp, 2) && vgetq_lane_u32(cmp, 3);
+#else
+    // Scalar fallback
+    return Math::is_zero_approx(x) &&
+           Math::is_zero_approx(y) &&
+           Math::is_zero_approx(z) &&
+           Math::is_zero_approx(w);
+#endif
+}
 
-        // Example partial: ratio = (p_weight - p_pre_a_t) / (p_b_t - p_pre_a_t)
-        __m128 ratio_vec = _mm_sub_ps(w_val, pre_a_t_val);
-        ratio_vec = _mm_div_ps(ratio_vec, _mm_sub_ps(b_t_val, pre_a_t_val));
+Vector4 Vector4::cubic_interpolate_in_time(
+    const Vector4 &p_b,
+    const Vector4 &p_pre_a,
+    const Vector4 &p_post_b,
+    real_t p_weight,
+    real_t p_b_t,
+    real_t p_pre_a_t,
+    real_t p_post_b_t
+) const {
+#if defined(VECTOR4_USE_SSE)
+    // Load 4D vectors into SSE registers
+    __m128 v_this   = m_value;
+    __m128 v_b      = p_b.m_value;
+    __m128 v_pre_a  = p_pre_a.m_value;
+    __m128 v_post_b = p_post_b.m_value;
 
-        // For demonstration, final polynomial done per-component scalar:
-        float f_this[4], f_b[4], f_pre_a[4], f_post_b[4];
-        _mm_storeu_ps(f_this,   v_this);
-        _mm_storeu_ps(f_b,      v_b);
-        _mm_storeu_ps(f_pre_a,  v_pre_a);
-        _mm_storeu_ps(f_post_b, v_post_b);
+    // Broadcast scalar values to all SIMD lanes
+    __m128 w_val        = _mm_set1_ps(p_weight);
+    __m128 pre_a_t_val  = _mm_set1_ps(p_pre_a_t);
+    __m128 b_t_val      = _mm_set1_ps(p_b_t);
+    __m128 post_b_t_val = _mm_set1_ps(p_post_b_t);
 
-        Vector4 res;
-        res.x = Math::cubic_interpolate_in_time(f_this[0], f_b[0], f_pre_a[0], f_post_b[0],
-                                                p_weight, p_b_t, p_pre_a_t, p_post_b_t);
-        res.y = Math::cubic_interpolate_in_time(f_this[1], f_b[1], f_pre_a[1], f_post_b[1],
-                                                p_weight, p_b_t, p_pre_a_t, p_post_b_t);
-        res.z = Math::cubic_interpolate_in_time(f_this[2], f_b[2], f_pre_a[2], f_post_b[2],
-                                                p_weight, p_b_t, p_pre_a_t, p_post_b_t);
-        res.w = Math::cubic_interpolate_in_time(f_this[3], f_b[3], f_pre_a[3], f_post_b[3],
-                                                p_weight, p_b_t, p_pre_a_t, p_post_b_t);
+    // Calculate time deltas and ratios
+    __m128 b_minus_pre_a_t = _mm_sub_ps(b_t_val, pre_a_t_val);
+    __m128 post_b_minus_b_t = _mm_sub_ps(post_b_t_val, b_t_val);
 
-        return res;
+    // Avoid division by zero with a small epsilon adjustment
+    __m128 epsilon = _mm_set1_ps(CMP_EPSILON);
+    b_minus_pre_a_t = _mm_max_ps(b_minus_pre_a_t, epsilon);
+    post_b_minus_b_t = _mm_max_ps(post_b_minus_b_t, epsilon);
+
+    // Calculate interpolation factors
+    __m128 factor1 = _mm_div_ps(_mm_sub_ps(v_this, v_pre_a), b_minus_pre_a_t);
+    __m128 factor2 = _mm_div_ps(_mm_sub_ps(v_post_b, v_b), post_b_minus_b_t);
+
+    // Interpolate
+    __m128 interp = _mm_add_ps(
+        _mm_mul_ps(factor1, _mm_sub_ps(w_val, b_t_val)),
+        _mm_mul_ps(factor2, _mm_sub_ps(post_b_t_val, w_val))
+    );
+
+    // Store the result back into a Vector4
+    alignas(16) float result[4];
+    _mm_store_ps(result, interp);
+    return Vector4(result[0], result[1], result[2], result[3]);
 
 #elif defined(VECTOR4_USE_NEON)
-        // Similar approach in NEON
-        float32x4_t v_this   = m_value;
-        float32x4_t v_b      = p_b.m_value;
-        float32x4_t v_pre_a  = p_pre_a.m_value;
-        float32x4_t v_post_b = p_post_b.m_value;
+    // Load 4D vectors into NEON registers
+    float32x4_t v_this   = m_value;
+    float32x4_t v_b      = p_b.m_value;
+    float32x4_t v_pre_a  = p_pre_a.m_value;
+    float32x4_t v_post_b = p_post_b.m_value;
 
-        float32x4_t w_val        = vdupq_n_f32(p_weight);
-        float32x4_t pre_a_t_val  = vdupq_n_f32(p_pre_a_t);
-        float32x4_t b_t_val      = vdupq_n_f32(p_b_t);
-        float32x4_t post_b_t_val = vdupq_n_f32(p_post_b_t);
+    // Broadcast scalar values to NEON lanes
+    float32x4_t w_val        = vdupq_n_f32(p_weight);
+    float32x4_t pre_a_t_val  = vdupq_n_f32(p_pre_a_t);
+    float32x4_t b_t_val      = vdupq_n_f32(p_b_t);
+    float32x4_t post_b_t_val = vdupq_n_f32(p_post_b_t);
 
-        float32x4_t ratio_vec = vsubq_f32(w_val, pre_a_t_val);
-        ratio_vec = vdivq_f32(ratio_vec, vsubq_f32(b_t_val, pre_a_t_val));
+    // Calculate time deltas and ratios
+    float32x4_t b_minus_pre_a_t = vsubq_f32(b_t_val, pre_a_t_val);
+    float32x4_t post_b_minus_b_t = vsubq_f32(post_b_t_val, b_t_val);
 
-        alignas(16) float f_this[4], f_b[4], f_pre_a[4], f_post_b[4];
-        vst1q_f32(f_this,   v_this);
-        vst1q_f32(f_b,      v_b);
-        vst1q_f32(f_pre_a,  v_pre_a);
-        vst1q_f32(f_post_b, v_post_b);
+    // Avoid division by zero with a small epsilon adjustment
+    float32x4_t epsilon = vdupq_n_f32(CMP_EPSILON);
+    b_minus_pre_a_t = vmaxq_f32(b_minus_pre_a_t, epsilon);
+    post_b_minus_b_t = vmaxq_f32(post_b_minus_b_t, epsilon);
 
-        Vector4 res;
-        res.x = Math::cubic_interpolate_in_time(f_this[0], f_b[0], f_pre_a[0], f_post_b[0],
-                                                p_weight, p_b_t, p_pre_a_t, p_post_b_t);
-        res.y = Math::cubic_interpolate_in_time(f_this[1], f_b[1], f_pre_a[1], f_post_b[1],
-                                                p_weight, p_b_t, p_pre_a_t, p_post_b_t);
-        res.z = Math::cubic_interpolate_in_time(f_this[2], f_b[2], f_pre_a[2], f_post_b[2],
-                                                p_weight, p_b_t, p_pre_a_t, p_post_b_t);
-        res.w = Math::cubic_interpolate_in_time(f_this[3], f_b[3], f_pre_a[3], f_post_b[3],
-                                                p_weight, p_b_t, p_pre_a_t, p_post_b_t);
+    // Calculate interpolation factors
+    float32x4_t factor1 = vdivq_f32(vsubq_f32(v_this, v_pre_a), b_minus_pre_a_t);
+    float32x4_t factor2 = vdivq_f32(vsubq_f32(v_post_b, v_b), post_b_minus_b_t);
 
-        return res;
+    // Interpolate
+    float32x4_t interp = vaddq_f32(
+        vmulq_f32(factor1, vsubq_f32(w_val, b_t_val)),
+        vmulq_f32(factor2, vsubq_f32(post_b_t_val, w_val))
+    );
+
+    // Store the result back into a Vector4
+    alignas(16) float result[4];
+    vst1q_f32(result, interp);
+    return Vector4(result[0], result[1], result[2], result[3]);
 
 #else
-        // Pure scalar fallback
-        Vector4 res = *this;
-        res.x = Math::cubic_interpolate_in_time(res.x, p_b.x, p_pre_a.x, p_post_b.x,
-                                                p_weight, p_b_t, p_pre_a_t, p_post_b_t);
-        res.y = Math::cubic_interpolate_in_time(res.y, p_b.y, p_pre_a.y, p_post_b.y,
-                                                p_weight, p_b_t, p_pre_a_t, p_post_b_t);
-        res.z = Math::cubic_interpolate_in_time(res.z, p_b.z, p_pre_a.z, p_post_b.z,
-                                                p_weight, p_b_t, p_pre_a_t, p_post_b_t);
-        res.w = Math::cubic_interpolate_in_time(res.w, p_b.w, p_pre_a.w, p_post_b.w,
-                                                p_weight, p_b_t, p_pre_a_t, p_post_b_t);
-        return res;
+    // Scalar fallback
+    Vector4 result;
+    result.x = Math::cubic_interpolate_in_time(x, p_b.x, p_pre_a.x, p_post_b.x,
+                                               p_weight, p_b_t, p_pre_a_t, p_post_b_t);
+    result.y = Math::cubic_interpolate_in_time(y, p_b.y, p_pre_a.y, p_post_b.y,
+                                               p_weight, p_b_t, p_pre_a_t, p_post_b_t);
+    result.z = Math::cubic_interpolate_in_time(z, p_b.z, p_pre_a.z, p_post_b.z,
+                                               p_weight, p_b_t, p_pre_a_t, p_post_b_t);
+    result.w = Math::cubic_interpolate_in_time(w, p_b.w, p_pre_a.w, p_post_b.w,
+                                               p_weight, p_b_t, p_pre_a_t, p_post_b_t);
+    return result;
 #endif
-    }
+}
+
+void Vector4::snapf(real_t p_step) {
+#if defined(VECTOR4_USE_SSE)
+    __m128 step = _mm_set1_ps(p_step);
+    __m128 inv_step = _mm_div_ps(_mm_set1_ps(1.0f), step); // 1 / step
+    __m128 vec = m_value;
+
+    // Scale components by the inverse step, round them, and scale back
+    vec = _mm_mul_ps(vec, inv_step);
+    vec = _mm_round_ps(vec, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC); // Round to nearest
+    vec = _mm_mul_ps(vec, step);
+
+    m_value = vec;
+
+#elif defined(VECTOR4_USE_NEON)
+    float32x4_t step = vdupq_n_f32(p_step);
+    float32x4_t inv_step = vrecpeq_f32(step); // Approximation for 1 / step
+    float32x4_t vec = vld1q_f32(coord);
+
+    // Scale components by the inverse step, round them, and scale back
+    vec = vmulq_f32(vec, inv_step);
+    vec = vrndnq_f32(vec); // Round to nearest
+    vec = vmulq_f32(vec, step);
+
+    vst1q_f32(coord, vec);
+
+#else
+    // Scalar fallback
+    x = Math::snapped(x, p_step);
+    y = Math::snapped(y, p_step);
+    z = Math::snapped(z, p_step);
+    w = Math::snapped(w, p_step);
+#endif
+}
+
+Vector4 Vector4::snappedf(real_t p_step) const {
+#if defined(VECTOR4_USE_SSE)
+    __m128 step = _mm_set1_ps(p_step);
+    __m128 inv_step = _mm_div_ps(_mm_set1_ps(1.0f), step); // 1 / step
+    __m128 vec = m_value;
+
+    // Scale components by the inverse step, round them, and scale back
+    vec = _mm_mul_ps(vec, inv_step);
+    vec = _mm_round_ps(vec, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC); // Round to nearest
+    vec = _mm_mul_ps(vec, step);
+
+    alignas(16) float result[4];
+    _mm_store_ps(result, vec);
+    return Vector4(result[0], result[1], result[2], result[3]);
+
+#elif defined(VECTOR4_USE_NEON)
+    float32x4_t step = vdupq_n_f32(p_step);
+    float32x4_t inv_step = vrecpeq_f32(step); // Approximation for 1 / step
+    float32x4_t vec = vld1q_f32(coord);
+
+    // Scale components by the inverse step, round them, and scale back
+    vec = vmulq_f32(vec, inv_step);
+    vec = vrndnq_f32(vec); // Round to nearest
+    vec = vmulq_f32(vec, step);
+
+    alignas(16) float result[4];
+    vst1q_f32(result, vec);
+    return Vector4(result[0], result[1], result[2], result[3]);
+
+#else
+    // Scalar fallback
+    return Vector4(
+        Math::snapped(x, p_step),
+        Math::snapped(y, p_step),
+        Math::snapped(z, p_step),
+        Math::snapped(w, p_step)
+    );
+#endif
+}
+
+_FORCE_INLINE_ friend Vector4 operator*(float p_scalar, const Vector4 &p_vec) {
+#if defined(VECTOR4_USE_SSE)
+    __m128 scalar = _mm_set1_ps(p_scalar);
+    __m128 vec = p_vec.m_value;
+    __m128 result = _mm_mul_ps(scalar, vec);
+    alignas(16) float result_array[4];
+    _mm_store_ps(result_array, result);
+    return Vector4(result_array[0], result_array[1], result_array[2], result_array[3]);
+#elif defined(VECTOR4_USE_NEON)
+    float32x4_t scalar = vdupq_n_f32(p_scalar);
+    float32x4_t vec = vld1q_f32(p_vec.coord);
+    float32x4_t result = vmulq_f32(scalar, vec);
+    alignas(16) float result_array[4];
+    vst1q_f32(result_array, result);
+    return Vector4(result_array[0], result_array[1], result_array[2], result_array[3]);
+#else
+    return Vector4(
+        p_scalar * p_vec.x,
+        p_scalar * p_vec.y,
+        p_scalar * p_vec.z,
+        p_scalar * p_vec.w
+    );
+#endif
+}
+
+_FORCE_INLINE_ friend Vector4 operator*(double p_scalar, const Vector4 &p_vec) {
+    return static_cast<float>(p_scalar) * p_vec; // Use the float implementation
+}
+
+_FORCE_INLINE_ friend Vector4 operator*(int32_t p_scalar, const Vector4 &p_vec) {
+    return static_cast<float>(p_scalar) * p_vec; // Use the float implementation
+}
+
+_FORCE_INLINE_ friend Vector4 operator*(int64_t p_scalar, const Vector4 &p_vec) {
+    return static_cast<float>(p_scalar) * p_vec; // Use the float implementation
+}
+
+    	operator String() const;
+        operator Vector4i() const;
 };
 
 #endif // VECTOR4_H
