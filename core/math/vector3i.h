@@ -151,10 +151,6 @@ struct [[nodiscard]] Vector3i {
 
 template <typename T,
           typename std::enable_if<is_valid_vector3i_scalar<T>::value, bool>::type>
-_FORCE_INLINE_ Vector3i operator*(T p_scalar, const Vector3i &p_vector);
-
-template <typename T,
-          typename std::enable_if<is_valid_vector3i_scalar<T>::value, bool>::type>
 Vector3i operator*(T p_scalar, const Vector3i &p_vector) {
     return p_vector * static_cast<int>(p_scalar);
 }
