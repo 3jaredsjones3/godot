@@ -6,8 +6,11 @@
 #include "core/math/math_funcs.h"
 #include "core/string/ustring.h"
 #include "core/typedefs.h"
+
 #include "vector2.h"
 #include "core/math/vector3i.h"
+
+#include <type_traits>
 
 const float M_PI = 3.14159265358979323846f;
 
@@ -1669,10 +1672,18 @@ _FORCE_INLINE_ bool is_equal_approx(const Vector3& p_v) const {
 /*********************************************************************************/
 /* Global operators */
 /*********************************************************************************/
-_FORCE_INLINE_ Vector3 operator*(float scalar, const Vector3& vec);
-_FORCE_INLINE_ Vector3 operator*(double scalar, const Vector3& vec);
-_FORCE_INLINE_ Vector3 operator*(int32_t scalar, const Vector3& vec);
-_FORCE_INLINE_ Vector3 operator*(int64_t scalar, const Vector3& vec);
+template<typename T>
+struct is_valid_vector3_scalar {
+    static constexpr bool value = 
+        std::is_arithmetic<T>::value && 
+        !std::is_same<typename std::remove_cv<typename std::remove_reference<T>::type>::type, Vector3i>::value;
+};
+
+template <typename T, 
+          typename std::enable_if<is_valid_vector3_scalar<T>::value, bool>::type = true>
+_FORCE_INLINE_ Vector3 operator*(T scalar, const Vector3& vec) {
+    return vec * static_cast<real_t>(scalar);
+}
 
 _FORCE_INLINE_ Vector3 vec3_cross(const Vector3& a, const Vector3& b) {
     return Vector3::vec3_cross(a, b);

@@ -44,23 +44,6 @@ Basis Vector3::outer(const Vector3& p_with) const {
 #endif
 }
 
-// Global operator* implementations
-_FORCE_INLINE_ Vector3 operator*(float scalar, const Vector3& vec) {
-    return vec * scalar; // Uses member operator*
-}
-
-_FORCE_INLINE_ Vector3 operator*(double scalar, const Vector3& vec) {
-    return vec * static_cast<real_t>(scalar); // Ensure type consistency
-}
-
-_FORCE_INLINE_ Vector3 operator*(int32_t scalar, const Vector3& vec) {
-    return vec * static_cast<real_t>(scalar);
-}
-
-_FORCE_INLINE_ Vector3 operator*(int64_t scalar, const Vector3& vec) {
-    return vec * static_cast<real_t>(scalar);
-}
-
 const Vector3 Vector3::ZERO = Vector3(0.0f, 0.0f, 0.0f);
 const Vector3 Vector3::ONE = Vector3(1.0f, 1.0f, 1.0f);
 const Vector3 Vector3::LEFT = Vector3(-1.0f, 0.0f, 0.0f);

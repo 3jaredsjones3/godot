@@ -33,9 +33,17 @@
 
 #include "core/error/error_macros.h"
 #include "core/math/math_funcs.h"
+#include <type_traits>
 
 class String;
 struct Vector3;
+
+template<typename T>
+struct is_valid_vector3i_scalar {
+    static constexpr bool value = 
+        std::is_integral<T>::value && 
+        !std::is_same<typename std::remove_cv<typename std::remove_reference<T>::type>::type, Vector3>::value;
+};
 
 struct [[nodiscard]] Vector3i {
 	static const int AXIS_COUNT = 3;
@@ -113,8 +121,8 @@ struct [[nodiscard]] Vector3i {
 	_FORCE_INLINE_ Vector3i &operator%=(const Vector3i &p_v);
 	_FORCE_INLINE_ Vector3i operator%(const Vector3i &p_v) const;
 
-	_FORCE_INLINE_ Vector3i &operator*=(int32_t p_scalar);
-	_FORCE_INLINE_ Vector3i operator*(int32_t p_scalar) const;
+	_FORCE_INLINE_ Vector3i &operator*=(int p_scalar);
+	_FORCE_INLINE_ Vector3i operator*(int p_scalar) const;
 	_FORCE_INLINE_ Vector3i &operator/=(int32_t p_scalar);
 	_FORCE_INLINE_ Vector3i operator/(int32_t p_scalar) const;
 	_FORCE_INLINE_ Vector3i &operator%=(int32_t p_scalar);
@@ -138,7 +146,12 @@ struct [[nodiscard]] Vector3i {
 		y = p_y;
 		z = p_z;
 	}
+
 };
+
+template <typename T,
+          typename std::enable_if<is_valid_vector3i_scalar<T>::value, bool>::type>
+_FORCE_INLINE_ Vector3i operator*(T p_scalar, const Vector3i &p_vector);
 
 int64_t Vector3i::length_squared() const {
 	return x * (int64_t)x + y * (int64_t)y + z * (int64_t)z;
@@ -220,35 +233,6 @@ Vector3i &Vector3i::operator%=(const Vector3i &p_v) {
 Vector3i Vector3i::operator%(const Vector3i &p_v) const {
 	return Vector3i(x % p_v.x, y % p_v.y, z % p_v.z);
 }
-
-Vector3i &Vector3i::operator*=(int32_t p_scalar) {
-	x *= p_scalar;
-	y *= p_scalar;
-	z *= p_scalar;
-	return *this;
-}
-
-Vector3i Vector3i::operator*(int32_t p_scalar) const {
-	return Vector3i(x * p_scalar, y * p_scalar, z * p_scalar);
-}
-
-// Multiplication operators required to workaround issues with LLVM using implicit conversion.
-
-_FORCE_INLINE_ Vector3i operator*(int32_t p_scalar, const Vector3i &p_vector) {
-	return p_vector * p_scalar;
-}
-
-//_FORCE_INLINE_ Vector3i operator*(int64_t p_scalar, const Vector3i &p_vector) {
-//	return p_vector * p_scalar;
-//}
-
-//_FORCE_INLINE_ Vector3i operator*(float p_scalar, const Vector3i &p_vector) {
-//	return p_vector * p_scalar;
-//}
-
-//_FORCE_INLINE_ Vector3i operator*(double p_scalar, const Vector3i &p_vector) {
-//	return p_vector * p_scalar;
-//}
 
 Vector3i &Vector3i::operator/=(int32_t p_scalar) {
 	x /= p_scalar;
