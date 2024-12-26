@@ -38,6 +38,8 @@
 #include "core/string/print_string.h"
 #include "core/variant/variant_parser.h"
 
+#include <cassert>
+
 PagedAllocator<Variant::Pools::BucketSmall, true> Variant::Pools::_bucket_small;
 PagedAllocator<Variant::Pools::BucketMedium, true> Variant::Pools::_bucket_medium;
 PagedAllocator<Variant::Pools::BucketLarge, true> Variant::Pools::_bucket_large;
@@ -2547,9 +2549,9 @@ Variant::Variant(const Vector3i &p_vector3i) :
 	memnew_placement(_data._mem, Vector3i(p_vector3i));
 }
 
-Variant::Variant(const Vector4 &p_vector4) :
-		type(VECTOR4) {
-	memnew_placement(_data._mem, Vector4(p_vector4));
+Variant::Variant(const Vector4 &p_vector4) : type(VECTOR4) {
+    assert(reinterpret_cast<uintptr_t>(_data._mem) % alignof(Vector4) == 0 && "Alignment mismatch for Vector4");
+    memnew_placement(_data._mem, Vector4(p_vector4));
 }
 
 Variant::Variant(const Vector4i &p_vector4i) :

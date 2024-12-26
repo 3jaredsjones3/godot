@@ -2688,6 +2688,23 @@ static void _register_variant_builtin_constants() {
 	for (int i = 0; i < ncc; i++) {
 		_VariantCall::add_variant_constant(Variant::COLOR, Color::get_named_color_name(i), Color::get_named_color(i));
 	}
+//Fixing alignment of SIMD objects
+alignas(16) const Vector3 VECTOR3_ZERO(0, 0, 0);
+alignas(16) const Vector3 VECTOR3_ONE(1, 1, 1);
+alignas(16) const Vector3 VECTOR3_INF(INFINITY, INFINITY, INFINITY);
+alignas(16) const Vector3 VECTOR3_LEFT(-1, 0, 0);
+alignas(16) const Vector3 VECTOR3_RIGHT(1, 0, 0);
+alignas(16) const Vector3 VECTOR3_UP(0, 1, 0);
+alignas(16) const Vector3 VECTOR3_DOWN(0, -1, 0);
+alignas(16) const Vector3 VECTOR3_FORWARD(0, 0, -1);
+alignas(16) const Vector3 VECTOR3_BACK(0, 0, 1);
+
+alignas(16) const Vector3 VECTOR3_MODEL_LEFT(1, 0, 0);
+alignas(16) const Vector3 VECTOR3_MODEL_RIGHT(-1, 0, 0);
+alignas(16) const Vector3 VECTOR3_MODEL_TOP(0, 1, 0);
+alignas(16) const Vector3 VECTOR3_MODEL_BOTTOM(0, -1, 0);
+alignas(16) const Vector3 VECTOR3_MODEL_FRONT(0, 0, 1); 
+alignas(16) const Vector3 VECTOR3_MODEL_REAR(0, 0, -1);
 
 	_VariantCall::add_enum_constant(Variant::VECTOR3, "Axis", "AXIS_X", Vector3::AXIS_X);
 	_VariantCall::add_enum_constant(Variant::VECTOR3, "Axis", "AXIS_Y", Vector3::AXIS_Y);
@@ -2715,6 +2732,10 @@ static void _register_variant_builtin_constants() {
 	_VariantCall::add_enum_constant(Variant::VECTOR4, "Axis", "AXIS_Z", Vector4::AXIS_Z);
 	_VariantCall::add_enum_constant(Variant::VECTOR4, "Axis", "AXIS_W", Vector4::AXIS_W);
 
+
+alignas(16) const Vector4 VECTOR4_ZERO(0, 0, 0, 0);
+alignas(16) const Vector4 VECTOR4_ONE(1, 1, 1, 1);
+alignas(16) const Vector4 VECTOR4_INF(INFINITY, INFINITY, INFINITY, INFINITY);
 	_VariantCall::add_variant_constant(Variant::VECTOR4, "ZERO", Vector4(0, 0, 0, 0));
 	_VariantCall::add_variant_constant(Variant::VECTOR4, "ONE", Vector4(1, 1, 1, 1));
 	_VariantCall::add_variant_constant(Variant::VECTOR4, "INF", Vector4(INFINITY, INFINITY, INFINITY, INFINITY));
