@@ -121,7 +121,7 @@ struct [[nodiscard]] Vector3i {
 	_FORCE_INLINE_ Vector3i &operator%=(const Vector3i &p_v);
 	_FORCE_INLINE_ Vector3i operator%(const Vector3i &p_v) const;
 
-	_FORCE_INLINE_ Vector3i &operator*=(int p_scalar);
+	Vector3i &operator*=(int p_scalar);
 	Vector3i operator*(int p_scalar) const;
 	_FORCE_INLINE_ Vector3i &operator/=(int32_t p_scalar);
 	_FORCE_INLINE_ Vector3i operator/(int32_t p_scalar) const;
@@ -152,6 +152,12 @@ struct [[nodiscard]] Vector3i {
 template <typename T,
           typename std::enable_if<is_valid_vector3i_scalar<T>::value, bool>::type>
 _FORCE_INLINE_ Vector3i operator*(T p_scalar, const Vector3i &p_vector);
+
+template <typename T,
+          typename std::enable_if<is_valid_vector3i_scalar<T>::value, bool>::type>
+Vector3i operator*(T p_scalar, const Vector3i &p_vector) {
+    return p_vector * static_cast<int>(p_scalar);
+}
 
 int64_t Vector3i::length_squared() const {
 	return x * (int64_t)x + y * (int64_t)y + z * (int64_t)z;
