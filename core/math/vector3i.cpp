@@ -77,12 +77,6 @@ Vector3i::operator Vector3() const {
 	return Vector3(x, y, z);
 }
 
-template <typename T,
-          typename std::enable_if<is_valid_vector3i_scalar<T>::value, bool>::type>
-Vector3i operator*(T p_scalar, const Vector3i &p_vector) {
-    return p_vector * static_cast<int>(p_scalar);
-}
-
 Vector3i Vector3i::operator*(int p_scalar) const {
     return Vector3i(x * p_scalar, y * p_scalar, z * p_scalar);
 }
