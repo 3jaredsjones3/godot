@@ -122,7 +122,7 @@ struct [[nodiscard]] Vector3i {
 	_FORCE_INLINE_ Vector3i operator%(const Vector3i &p_v) const;
 
 	_FORCE_INLINE_ Vector3i &operator*=(int p_scalar);
-	_FORCE_INLINE_ Vector3i operator*(int p_scalar) const;
+	Vector3i operator*(int p_scalar) const;
 	_FORCE_INLINE_ Vector3i &operator/=(int32_t p_scalar);
 	_FORCE_INLINE_ Vector3i operator/(int32_t p_scalar) const;
 	_FORCE_INLINE_ Vector3i &operator%=(int32_t p_scalar);

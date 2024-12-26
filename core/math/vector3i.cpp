@@ -87,6 +87,7 @@ Vector3i Vector3i::operator*(int p_scalar) const {
     return Vector3i(x * p_scalar, y * p_scalar, z * p_scalar);
 }
 
+
 Vector3i& Vector3i::operator*=(int p_scalar) {
     x *= p_scalar;
     y *= p_scalar;
