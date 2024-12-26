@@ -732,6 +732,7 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 
 	// Completion
 	EDITOR_SETTING(Variant::FLOAT, PROPERTY_HINT_RANGE, "text_editor/completion/idle_parse_delay", 1.5, "0.1,10,0.01")
+	EDITOR_SETTING(Variant::FLOAT, PROPERTY_HINT_RANGE, "text_editor/completion/idle_parse_delay_with_errors_found", 0.5, "0.1,5,0.01")
 	_initial_set("text_editor/completion/auto_brace_complete", true, true);
 	_initial_set("text_editor/completion/code_complete_enabled", true, true);
 	EDITOR_SETTING(Variant::FLOAT, PROPERTY_HINT_RANGE, "text_editor/completion/code_complete_delay", 0.3, "0.01,5,0.01,or_greater")
@@ -763,8 +764,6 @@ void EditorSettings::_load_defaults(Ref<ConfigFile> p_extra_config) {
 	_initial_set("editors/grid_map/palette_min_width", 230);
 	set_restart_if_changed("editors/grid_map/palette_min_width", true);
 	_initial_set("editors/grid_map/preview_size", 64);
-	// GridMapEditorPlugin
-	EDITOR_SETTING(Variant::INT, PROPERTY_HINT_ENUM, "editors/grid_map/editor_side", 1, "Left,Right");
 
 	// 3D
 	EDITOR_SETTING_BASIC(Variant::COLOR, PROPERTY_HINT_NONE, "editors/3d/primary_grid_color", Color(0.56, 0.56, 0.56, 0.5), "")

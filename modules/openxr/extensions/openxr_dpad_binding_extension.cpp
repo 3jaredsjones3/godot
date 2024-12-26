@@ -29,7 +29,6 @@
 /**************************************************************************/
 
 #include "openxr_dpad_binding_extension.h"
-#include "../action_map/openxr_interaction_profile_metadata.h"
 #include "../openxr_api.h"
 #include "core/math/math_funcs.h"
 
@@ -93,7 +92,7 @@ void OpenXRDpadBindingModifier::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_wedge_angle", "wedge_angle"), &OpenXRDpadBindingModifier::set_wedge_angle);
 	ClassDB::bind_method(D_METHOD("get_wedge_angle"), &OpenXRDpadBindingModifier::get_wedge_angle);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "wedge_angle"), "set_wedge_angle", "get_wedge_angle");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "wedge_angle", PROPERTY_HINT_RANGE, "1.0,180.0,0.1,radians_as_degrees"), "set_wedge_angle", "get_wedge_angle");
 
 	ClassDB::bind_method(D_METHOD("set_is_sticky", "is_sticky"), &OpenXRDpadBindingModifier::set_is_sticky);
 	ClassDB::bind_method(D_METHOD("get_is_sticky"), &OpenXRDpadBindingModifier::get_is_sticky);
