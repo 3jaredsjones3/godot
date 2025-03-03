@@ -122,6 +122,7 @@ struct [[nodiscard]] Vector3 {
     }
 
     _FORCE_INLINE_ Vector3(real_t p_x, real_t p_y, real_t p_z, real_t p_w = 0.0f) {
+        DEV_ASSERT((reinterpret_cast<std::uintptr_t>(this) & 0xF) == 0);
         #if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3_USE_SSE)
             m_value = _mm_set_ps(p_w, p_z, p_y, p_x);
         #elif defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3_USE_NEON)
@@ -908,8 +909,17 @@ _FORCE_INLINE_ void snapf(real_t p_step) {
    __m128 rounded = _mm_round_ps(div, _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC);
    m_value = _mm_mul_ps(rounded, step);
 #elif defined(VECTOR3SIMD_USE_NEON)
+   // Check for division by zero
+   if (Math::is_zero_approx(p_step)) {
+       ERR_PRINT("Division by zero in snapf");
+       return;
+   }
    float32x4_t step = vdupq_n_f32(p_step);
-   float32x4_t div = vdivq_f32(m_value, step);
+   // Use reciprocal and multiply for division since vdivq_f32 is not native on some ARM platforms
+   float32x4_t recip = vrecpeq_f32(step);
+   // One Newton-Raphson iteration for better precision
+   recip = vmulq_f32(vrecpsq_f32(step, recip), recip);
+   float32x4_t div = vmulq_f32(m_value, recip);
    float32x4_t rounded = vcvtq_f32_s32(vcvtq_s32_f32(vaddq_f32(div, vdupq_n_f32(0.5f))));
    m_value = vmulq_f32(rounded, step);
 #else
@@ -1370,7 +1380,7 @@ _FORCE_INLINE_ Vector3 bezier_derivative(const Vector3& p_control_1, const Vecto
 
 
 Vector3 vector_divide_neon(Vector3 a, Vector3 b) {
-    #if defined(VECTOR3SIMD_USE_NEON)
+    #if defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3_USE_NEON)
     uint32x4_t is_zero = vceqq_f32(b.m_value, vdupq_n_f32(0.0f));
     if (vgetq_lane_u32(is_zero, 0) || vgetq_lane_u32(is_zero, 1) || vgetq_lane_u32(is_zero, 2)) {
         ERR_PRINT("Division by zero in vector division");
@@ -1381,7 +1391,7 @@ Vector3 vector_divide_neon(Vector3 a, Vector3 b) {
     return Vector3(vmulq_f32(a.m_value, reciprocal));
     #else
         // Fallback for scalar
-        return Vector3(a.x / b.x, a.y / b.y, a.z / b.z, a[3] / b[3]); 
+        return Vector3(a.x / b.x, a.y / b.y, a.z / b.z); 
     #endif
 }
 
@@ -1491,10 +1501,19 @@ _FORCE_INLINE_ Vector3 operator*(const Vector3& p_v) const {
 _FORCE_INLINE_ Vector3& operator/=(const Vector3& p_v) {
 #if defined(VECTOR3SIMD_USE_SSE)
     m_value = _mm_div_ps(m_value, p_v.m_value);
-#elif defined(VECTOR3SIMD_USE_NEON)
+#elif defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3_USE_NEON)
+    // Check for division by zero
+    uint32x4_t is_zero = vceqq_f32(p_v.m_value, vdupq_n_f32(0.0f));
+    if (vgetq_lane_u32(is_zero, 0) || vgetq_lane_u32(is_zero, 1) || vgetq_lane_u32(is_zero, 2)) {
+        ERR_PRINT("Division by zero in vector division");
+        *this = Vector3();
+        return *this;
+    }
     // neon doesn't have a divide instruction, so we need to use a reciprocal and multiply
-    // Use vector_divide_neon
-    m_value = vector_divide_neon(m_value, p_v.m_value);
+    float32x4_t reciprocal = vrecpeq_f32(p_v.m_value);
+    // One Newton-Raphson iteration for better precision
+    reciprocal = vmulq_f32(vrecpsq_f32(p_v.m_value, reciprocal), reciprocal);
+    m_value = vmulq_f32(m_value, reciprocal);
 #else
     x /= p_v.x;
     y /= p_v.y;
@@ -1542,9 +1561,15 @@ _FORCE_INLINE_ Vector3& operator/=(real_t p_scalar) {
 #if defined(VECTOR3SIMD_USE_SSE)
     __m128 scalar = _mm_set1_ps(p_scalar);
     m_value = _mm_div_ps(m_value, scalar);
-#elif defined(VECTOR3SIMD_USE_NEON)
-    float32x4_t scalar = vdupq_n_f32(p_scalar);
-    m_value = vector_divide_neon(m_value, scalar);
+#elif defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3_USE_NEON)
+    // Check for division by zero
+    if (Math::is_zero_approx(p_scalar)) {
+        ERR_PRINT("Division by zero in vector-scalar division");
+        *this = Vector3();
+        return *this;
+    }
+    // NEON doesn't have a direct scalar divide, use multiplication by reciprocal
+    m_value = vmulq_n_f32(m_value, 1.0f / p_scalar);
 #else
     x /= p_scalar;
     y /= p_scalar;
@@ -1557,9 +1582,14 @@ _FORCE_INLINE_ Vector3 operator/(real_t p_scalar) const {
 #if defined(VECTOR3SIMD_USE_SSE)
     __m128 scalar = _mm_set1_ps(p_scalar);
     return Vector3(_mm_div_ps(m_value, scalar));
-#elif defined(VECTOR3SIMD_USE_NEON)
-    float32x4_t scalar = vdupq_n_f32(p_scalar);
-    return Vector3(vector_divide_neon(m_value, scalar));
+#elif defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3_USE_NEON)
+    // Check for division by zero
+    if (Math::is_zero_approx(p_scalar)) {
+        ERR_PRINT("Division by zero in vector-scalar division");
+        return Vector3();
+    }
+    // NEON doesn't have a direct scalar divide, use multiplication by reciprocal
+    return Vector3(vmulq_n_f32(m_value, 1.0f / p_scalar));
 #else
     return Vector3(x / p_scalar, y / p_scalar, z / p_scalar);
 #endif

@@ -76,6 +76,12 @@ struct [[nodiscard]] alignas(16) Vector4 {
 #endif
     }
 
+#if defined(VECTOR4_USE_NEON)
+    _FORCE_INLINE_ Vector4(float32x4_t p_value) {
+        m_value = p_value;
+    }
+#endif
+
     _FORCE_INLINE_ real_t &operator[](int p_index) {
         ERR_FAIL_INDEX_V(p_index, 4, x); // Bounds checking for safety
         return coord[p_index];
@@ -136,9 +142,16 @@ struct [[nodiscard]] alignas(16) Vector4 {
 #if defined(VECTOR4_USE_SSE)
         return Vector4(_mm_div_ps(m_value, p_vec4.m_value));
 #elif defined(VECTOR4_USE_NEON)
+        // Check for division by zero
+        uint32x4_t is_zero = vceqq_f32(p_vec4.m_value, vdupq_n_f32(0.0f));
+        if (vgetq_lane_u32(is_zero, 0) || vgetq_lane_u32(is_zero, 1) || 
+            vgetq_lane_u32(is_zero, 2) || vgetq_lane_u32(is_zero, 3)) {
+            ERR_PRINT("Division by zero in vector division");
+            return Vector4();
+        }
         float32x4_t inv = vrecpeq_f32(p_vec4.m_value);
-        // One Newton-Raphson iteration can refine this if needed.
-        // inv = vmulq_f32(vrecpsq_f32(p_vec4.m_value, inv), inv);
+        // One Newton-Raphson iteration for better precision
+        inv = vmulq_f32(vrecpsq_f32(p_vec4.m_value, inv), inv);
         return Vector4(vmulq_f32(m_value, inv));
 #else
         return Vector4(x / p_vec4.x, y / p_vec4.y, z / p_vec4.z, w / p_vec4.w);
@@ -162,7 +175,13 @@ struct [[nodiscard]] alignas(16) Vector4 {
         __m128 scalar = _mm_set1_ps(p_scalar);
         return Vector4(_mm_div_ps(m_value, scalar));
 #elif defined(VECTOR4_USE_NEON)
-        return Vector4(vdivq_n_f32(m_value, p_scalar));
+        // Check for division by zero
+        if (Math::is_zero_approx(p_scalar)) {
+            ERR_PRINT("Division by zero in vector division (scalar)");
+            return Vector4();
+        }
+        // NEON doesn't have a direct scalar divide, use multiplication by reciprocal
+        return Vector4(vmulq_n_f32(m_value, 1.0f / p_scalar));
 #else
         return Vector4(x / p_scalar, y / p_scalar, z / p_scalar, w / p_scalar);
 #endif
@@ -178,6 +197,45 @@ struct [[nodiscard]] alignas(16) Vector4 {
         y += p_vec4.y;
         z += p_vec4.z;
         w += p_vec4.w;
+#endif
+        return *this;
+    }
+    
+    _FORCE_INLINE_ Vector4 &operator*=(const Vector4 &p_vec4) {
+#if defined(VECTOR4_USE_SSE)
+        m_value = _mm_mul_ps(m_value, p_vec4.m_value);
+#elif defined(VECTOR4_USE_NEON)
+        m_value = vmulq_f32(m_value, p_vec4.m_value);
+#else
+        x *= p_vec4.x;
+        y *= p_vec4.y;
+        z *= p_vec4.z;
+        w *= p_vec4.w;
+#endif
+        return *this;
+    }
+    
+    _FORCE_INLINE_ Vector4 &operator/=(const Vector4 &p_vec4) {
+#if defined(VECTOR4_USE_SSE)
+        m_value = _mm_div_ps(m_value, p_vec4.m_value);
+#elif defined(VECTOR4_USE_NEON)
+        // Check for division by zero
+        uint32x4_t is_zero = vceqq_f32(p_vec4.m_value, vdupq_n_f32(0.0f));
+        if (vgetq_lane_u32(is_zero, 0) || vgetq_lane_u32(is_zero, 1) || 
+            vgetq_lane_u32(is_zero, 2) || vgetq_lane_u32(is_zero, 3)) {
+            ERR_PRINT("Division by zero in vector division");
+            *this = Vector4();
+            return *this;
+        }
+        float32x4_t inv = vrecpeq_f32(p_vec4.m_value);
+        // One Newton-Raphson iteration for better precision
+        inv = vmulq_f32(vrecpsq_f32(p_vec4.m_value, inv), inv);
+        m_value = vmulq_f32(m_value, inv);
+#else
+        x /= p_vec4.x;
+        y /= p_vec4.y;
+        z /= p_vec4.z;
+        w /= p_vec4.w;
 #endif
         return *this;
     }
@@ -216,7 +274,14 @@ struct [[nodiscard]] alignas(16) Vector4 {
         __m128 scalar = _mm_set1_ps(p_scalar);
         m_value = _mm_div_ps(m_value, scalar);
 #elif defined(VECTOR4_USE_NEON)
-        m_value = vdivq_f32(m_value, vdupq_n_f32(p_scalar));
+        // Check for division by zero
+        if (Math::is_zero_approx(p_scalar)) {
+            ERR_PRINT("Division by zero in vector-scalar division");
+            *this = Vector4();
+            return *this;
+        }
+        // NEON doesn't have a direct scalar divide, use multiplication by reciprocal
+        m_value = vmulq_n_f32(m_value, 1.0f / p_scalar);
 #else
         x /= p_scalar;
         y /= p_scalar;
@@ -488,6 +553,13 @@ _FORCE_INLINE_ Vector4 floor() const {
         __m128 snapped = _mm_mul_ps(floorVal, steps);
         return Vector4(snapped);
 #elif defined(VECTOR4_USE_NEON)
+        // Check for division by zero
+        uint32x4_t is_zero = vceqq_f32(p_step.m_value, vdupq_n_f32(0.0f));
+        if (vgetq_lane_u32(is_zero, 0) || vgetq_lane_u32(is_zero, 1) || 
+            vgetq_lane_u32(is_zero, 2) || vgetq_lane_u32(is_zero, 3)) {
+            ERR_PRINT("Division by zero in vector snap");
+            return *this;
+        }
         float32x4_t divVal   = vdivq_f32(m_value, p_step.m_value);
         float32x4_t floorVal = vfloorq_f32(divVal);
         return Vector4(vmulq_f32(floorVal, p_step.m_value));
@@ -889,8 +961,14 @@ Vector4 cubic_interpolate_in_time(
     post_b_minus_b_t = vmaxq_f32(post_b_minus_b_t, epsilon);
 
     // Calculate interpolation factors
-    float32x4_t factor1 = vdivq_f32(vsubq_f32(v_this, v_pre_a), b_minus_pre_a_t);
-    float32x4_t factor2 = vdivq_f32(vsubq_f32(v_post_b, v_b), post_b_minus_b_t);
+    // Use reciprocal and multiply for division since vdivq_f32 is not native on all NEON platforms
+    float32x4_t recip1 = vrecpeq_f32(b_minus_pre_a_t);
+    recip1 = vmulq_f32(vrecpsq_f32(b_minus_pre_a_t, recip1), recip1); // One Newton-Raphson iteration
+    float32x4_t recip2 = vrecpeq_f32(post_b_minus_b_t);
+    recip2 = vmulq_f32(vrecpsq_f32(post_b_minus_b_t, recip2), recip2); // One Newton-Raphson iteration
+    
+    float32x4_t factor1 = vmulq_f32(vsubq_f32(v_this, v_pre_a), recip1);
+    float32x4_t factor2 = vmulq_f32(vsubq_f32(v_post_b, v_b), recip2);
 
     // Interpolate
     float32x4_t interp = vaddq_f32(
@@ -931,8 +1009,15 @@ void snapf(real_t p_step) {
     m_value = vec;
 
 #elif defined(VECTOR4_USE_NEON)
+    // Check for division by zero
+    if (Math::is_zero_approx(p_step)) {
+        ERR_PRINT("Division by zero in snapf");
+        return;
+    }
     float32x4_t step = vdupq_n_f32(p_step);
     float32x4_t inv_step = vrecpeq_f32(step); // Approximation for 1 / step
+    // One Newton-Raphson iteration for better precision
+    inv_step = vmulq_f32(vrecpsq_f32(step, inv_step), inv_step);
     float32x4_t vec = m_value;
 
     vec = vmulq_f32(vec, inv_step);
@@ -964,8 +1049,15 @@ Vector4 snappedf(real_t p_step) const {
     return Vector4(result[0], result[1], result[2], result[3]);
 
 #elif defined(VECTOR4_USE_NEON)
+    // Check for division by zero
+    if (Math::is_zero_approx(p_step)) {
+        ERR_PRINT("Division by zero in snappedf");
+        return Vector4();
+    }
     float32x4_t step = vdupq_n_f32(p_step);
     float32x4_t inv_step = vrecpeq_f32(step); // Approximation for 1 / step
+    // One Newton-Raphson iteration for better precision
+    inv_step = vmulq_f32(vrecpsq_f32(step, inv_step), inv_step);
     float32x4_t vec = m_value;
 
     vec = vmulq_f32(vec, inv_step);
@@ -1076,6 +1168,11 @@ _FORCE_INLINE_ Vector4 posmod(real_t p_mod) const {
     );
     return Vector4(result);
 #elif defined(VECTOR4_USE_NEON)
+    // Check for division by zero
+    if (Math::is_zero_approx(p_mod)) {
+        ERR_PRINT("Division by zero in posmod");
+        return Vector4();
+    }
     float32x4_t mod = vdupq_n_f32(p_mod);
     float32x4_t div = vdivq_f32(m_value, mod);
     float32x4_t floor_div = vrndmq_f32(div); // Floor division
@@ -1101,6 +1198,13 @@ _FORCE_INLINE_ Vector4 posmodv(const Vector4 &p_modv) const {
     );
     return Vector4(result);
 #elif defined(VECTOR4_USE_NEON)
+    // Check for division by zero
+    uint32x4_t is_zero = vceqq_f32(p_modv.m_value, vdupq_n_f32(0.0f));
+    if (vgetq_lane_u32(is_zero, 0) || vgetq_lane_u32(is_zero, 1) || 
+        vgetq_lane_u32(is_zero, 2) || vgetq_lane_u32(is_zero, 3)) {
+        ERR_PRINT("Division by zero in posmodv");
+        return Vector4();
+    }
     float32x4_t mod = p_modv.m_value;
     float32x4_t div = vdivq_f32(m_value, mod);
     float32x4_t floor_div = vrndmq_f32(div); // Floor division
