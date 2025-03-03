@@ -31,7 +31,6 @@
 #include "create_dialog.h"
 
 #include "core/object/class_db.h"
-#include "core/os/keyboard.h"
 #include "editor/editor_feature_profile.h"
 #include "editor/editor_node.h"
 #include "editor/editor_paths.h"
@@ -831,7 +830,7 @@ CreateDialog::CreateDialog() {
 	vbc->add_margin_child(TTR("Matches:"), search_options, true);
 
 	help_bit = memnew(EditorHelpBit);
-	help_bit->set_content_height_limits(64 * EDSCALE, 64 * EDSCALE);
+	help_bit->set_content_height_limits(80 * EDSCALE, 80 * EDSCALE);
 	help_bit->connect("request_hide", callable_mp(this, &CreateDialog::_hide_requested));
 	vbc->add_margin_child(TTR("Description:"), help_bit);
 

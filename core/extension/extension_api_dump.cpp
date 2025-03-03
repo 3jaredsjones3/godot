@@ -32,7 +32,7 @@
 
 #include "core/config/engine.h"
 #include "core/core_constants.h"
-#include "core/extension/gdextension_compat_hashes.h"
+#include "core/extension/gdextension_special_compat_hashes.h"
 #include "core/io/file_access.h"
 #include "core/io/json.h"
 #include "core/templates/pair.h"
@@ -1100,7 +1100,7 @@ api_dump["builtin_class_sizes"] = core_type_sizes;
 						}
 
 #ifndef DISABLE_DEPRECATED
-						GDExtensionCompatHashes::get_legacy_hashes(class_name, method_name, compatibility);
+						GDExtensionSpecialCompatHashes::get_legacy_hashes(class_name, method_name, compatibility);
 #endif
 
 						if (compatibility.size() > 0) {
