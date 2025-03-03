@@ -38,7 +38,6 @@
 #include "core/templates/pair.h"
 #include "core/version.h"
 
-#include <iostream>
 
 #ifdef TOOLS_ENABLED
 #include "editor/editor_help.h"
@@ -242,18 +241,12 @@ Dictionary GDExtensionAPIDump::generate_extension_api(bool p_include_docs) {
 
 		Array core_type_sizes;
 
-for (int i = 0; i < 4; i++) { // Outer loop for build configurations
+for (int i = 0; i < 4; i++) { // Outer loop for configurations
     Dictionary d;
     d["build_configuration"] = build_config_name[i];
     Array sizes;
 
     for (int j = 0; j <= Variant::VARIANT_MAX; j++) { // Inner loop for Variant types
-        Variant::Type t = type_size_array[j].type;
-        String name = t == Variant::VARIANT_MAX ? String("Variant") : Variant::get_type_name(t);
-        Dictionary d2;
-        d2["name"] = name;
-
-        // Declare and assign size
         uint32_t expected_size = 0;
         switch (i) {
             case 0:
@@ -270,22 +263,17 @@ for (int i = 0; i < 4; i++) { // Outer loop for build configurations
                 break;
         }
 
-        // Actual size of Variant (only for Variant::VARIANT_MAX)
-        if (j == Variant::VARIANT_MAX) {
-            uint32_t actual_size = static_cast<uint32_t>(sizeof(Variant));
-
-            // Print expected vs actual sizes for debugging
-            std::cout << "Expected size of Variant: " << expected_size
-                      << ", Actual size: " << actual_size << std::endl;
-        }
-
-        d2["size"] = expected_size; // Add expected size to dictionary
+        // Add sizes to the dictionary
+        Dictionary d2;
+        d2["name"] = Variant::get_type_name(type_size_array[j].type);
+        d2["size"] = expected_size;
         sizes.push_back(d2);
     }
 
     d["sizes"] = sizes;
     core_type_sizes.push_back(d);
 }
+
 
 api_dump["builtin_class_sizes"] = core_type_sizes;
 	}

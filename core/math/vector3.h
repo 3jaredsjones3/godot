@@ -16,6 +16,7 @@ const float M_PI = 3.14159265358979323846f;
 
 #if (defined(__SSE__) || (defined(_M_X64) && !defined(__EMSCRIPTEN__))) && !defined(REAL_T_IS_DOUBLE)
 #define VECTOR3SIMD_USE_SSE
+#define VECTOR3_USE_SSE
 #include <emmintrin.h>  // SSE2
 #include <xmmintrin.h>  // SSE
 #endif
@@ -23,12 +24,13 @@ const float M_PI = 3.14159265358979323846f;
 //I'm still working through a lot of bugs for NEON but I will have to set up remote - ssh to test on my device first
 #if defined(__ARM_NEON) || defined(__aarch64__) && !defined(REAL_T_IS_DOUBLE)
 #define VECTOR3SIMD_USE_NEON
+#define VECTOR3_USE_NEON
 #include <arm_neon.h>
 #endif
 
-#if defined(VECTOR3SIMD_USE_SSE)
+#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3_USE_SSE)
 #include <immintrin.h>  // For _mm_sin_ps
-#elif defined(VECTOR3SIMD_USE_NEON)
+#elif defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3_USE_NEON)
 static inline float32x4_t sin_neon(float32x4_t x) {
     const float32x4_t c1 = vdupq_n_f32(1.0f);
     const float32x4_t c3 = vdupq_n_f32(-1.0f/6.0f);
@@ -70,7 +72,7 @@ static inline float32x4_t cos_neon(float32x4_t x) {
 
 struct Basis;
 
-#if defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3SIMD_USE_SSE)
+#if defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3_USE_NEON) || defined(VECTOR3_USE_SSE)
 struct [[nodiscard]] alignas(16) Vector3 {
 #else
 struct [[nodiscard]] Vector3 {
@@ -93,7 +95,7 @@ struct [[nodiscard]] Vector3 {
     static const Vector3 FORWARD;
     static const Vector3 BACK;
 
-#if defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3SIMD_USE_SSE)
+#if defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3_USE_NEON) || defined(VECTOR3_USE_SSE)
     // SIMD version
     union {
         struct {
@@ -103,36 +105,36 @@ struct [[nodiscard]] Vector3 {
             real_t _pad;
         };
         real_t coord[4];
-        #if defined(VECTOR3SIMD_USE_SSE)
+        #if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3_USE_SSE)
         __m128 m_value;
-        #elif defined(VECTOR3SIMD_USE_NEON)
+        #elif defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3_USE_NEON)
         float32x4_t m_value;
         #endif
     };
 
     // SIMD constructors
     _FORCE_INLINE_ Vector3() {
-        #if defined(VECTOR3SIMD_USE_SSE)
+        #if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3_USE_SSE)
             m_value = _mm_setzero_ps();
-        #elif defined(VECTOR3SIMD_USE_NEON)
+        #elif defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3_USE_NEON)
             m_value = vdupq_n_f32(0.0f);
         #endif
     }
 
     _FORCE_INLINE_ Vector3(real_t p_x, real_t p_y, real_t p_z, real_t p_w = 0.0f) {
-        #if defined(VECTOR3SIMD_USE_SSE)
+        #if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3_USE_SSE)
             m_value = _mm_set_ps(p_w, p_z, p_y, p_x);
-        #elif defined(VECTOR3SIMD_USE_NEON)
+        #elif defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3_USE_NEON)
             float temp[4] = {p_x, p_y, p_z, p_w};
             m_value = vld1q_f32(temp);
         #endif
     }
 
-    #if defined(VECTOR3SIMD_USE_SSE)
+    #if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3_USE_SSE)
     _FORCE_INLINE_ Vector3(__m128 p_val) {
         m_value = p_val;
     }
-    #elif defined(VECTOR3SIMD_USE_NEON)
+    #elif defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3_USE_NEON)
     _FORCE_INLINE_ Vector3(float32x4_t p_val) {
         m_value = p_val;
     }
@@ -234,18 +236,18 @@ struct [[nodiscard]] Vector3 {
     Basis outer(const Vector3& p_with) const;
 
     _FORCE_INLINE_ Vector3 cross(const Vector3& p_with) const {
-#if defined(VECTOR3SIMD_USE_SSE)
+#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3_USE_SSE)
           __m128 a = m_value;
           __m128 b = p_with.m_value;
           __m128 a_yzx = _mm_shuffle_ps(a, a, _MM_SHUFFLE(3, 0, 2, 1));
           __m128 b_yzx = _mm_shuffle_ps(b, b, _MM_SHUFFLE(3, 0, 2, 1));
           __m128 c = _mm_sub_ps(_mm_mul_ps(a, b_yzx), _mm_mul_ps(a_yzx, b));
           return Vector3(_mm_shuffle_ps(c, c, _MM_SHUFFLE(3, 0, 2, 1)));
-#elif defined(VECTOR3SIMD_USE_NEON)
+#elif defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3_USE_NEON)
         float32x4_t a_yzx = vextq_f32(m_value, m_value, 1);
         float32x4_t b_yzx = vextq_f32(p_with.m_value, p_with.m_value, 1); // Fixed from p_with
         float32x4_t c = vsubq_f32(vmulq_f32(m_value, b_yzx),
-                                vmulq_f32(a_yzx, p_v.m_value));
+                                vmulq_f32(a_yzx, p_with.m_value));
         return Vector3(vextq_f32(c, c, 3));
 #else
      return Vector3((y * p_with.z) - (z * p_with.y),
@@ -298,9 +300,9 @@ _FORCE_INLINE_ void normalize() {
         return;
     }
     real_t l = Math::sqrt(l2);
-#if defined(VECTOR3SIMD_USE_SSE)
+#if defined(VECTOR3SIMD_USE_SSE) || defined(VECTOR3_USE_SSE)
     m_value = _mm_div_ps(m_value, _mm_set1_ps(l));
-#elif defined(VECTOR3SIMD_USE_NEON)
+#elif defined(VECTOR3SIMD_USE_NEON) || defined(VECTOR3_USE_NEON)
     m_value = vmulq_n_f32(m_value, 1.0f / l);
 #else
     *this /= l;
