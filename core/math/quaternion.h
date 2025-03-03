@@ -10,7 +10,7 @@
 // Forward declarations
 struct Vector3;
 
-struct [[nodiscard]] Quaternion {
+struct Quaternion {
     union {
         struct {
             real_t x;
@@ -55,13 +55,14 @@ struct [[nodiscard]] Quaternion {
     }
 
 private:
-#if defined(VECTOR4_USE_SSE)
-    _FORCE_INLINE_ Quaternion quaternion_mul_sse(const Quaternion& p_q) const;
-#endif
-#if defined(VECTOR4_USE_NEON)
-    _FORCE_INLINE_ Quaternion quaternion_mul_neon(const Quaternion& p_q) const;
-#endif
-    _FORCE_INLINE_ Quaternion quaternion_mul_fallback(const Quaternion& p_q) const;
+    _FORCE_INLINE_ Quaternion quaternion_mul_fallback(const Quaternion& p_q) const {
+        return Quaternion(
+            components.dot(Vector4(p_q.x, p_q.w, p_q.z, -p_q.y)),
+            components.dot(Vector4(p_q.y, p_q.x, p_q.w, -p_q.z)),
+            components.dot(Vector4(p_q.z, p_q.y, p_q.w, -p_q.x)),
+            components.dot(Vector4(p_q.w, -p_q.x, -p_q.y, -p_q.z))
+        );
+    }
 
 public:
     // Core methods
@@ -117,13 +118,7 @@ public:
 
     // Operators
     _FORCE_INLINE_ Quaternion operator*(const Quaternion& p_q) const {
-#if defined(VECTOR4_USE_SSE)
-        return quaternion_mul_sse(p_q);
-#elif defined(VECTOR4_USE_NEON)
-        return quaternion_mul_neon(p_q);
-#else
         return quaternion_mul_fallback(p_q);
-#endif
     }
 
     _FORCE_INLINE_ void operator*=(const Quaternion& p_q) {

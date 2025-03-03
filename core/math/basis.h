@@ -196,8 +196,16 @@ struct [[nodiscard]] Basis {
 
 	static Basis looking_at(const Vector3 &p_target, const Vector3 &p_up = Vector3(0, 1, 0), bool p_use_model_front = false);
 
-	Basis(const Quaternion &p_quaternion) { set_quaternion(p_quaternion); }
-	Basis(const Quaternion &p_quaternion, const Vector3 &p_scale) { set_quaternion_scale(p_quaternion, p_scale); }
+	Basis(const Quaternion &p_quaternion) { 
+		// Ensure proper alignment when converting from quaternion
+		Quaternion aligned_quat = p_quaternion;
+		set_quaternion(aligned_quat); 
+	}
+	Basis(const Quaternion &p_quaternion, const Vector3 &p_scale) { 
+		// Ensure proper alignment when converting from quaternion
+		Quaternion aligned_quat = p_quaternion;
+		set_quaternion_scale(aligned_quat, p_scale); 
+	}
 
 	Basis(const Vector3 &p_axis, real_t p_angle) { set_axis_angle(p_axis, p_angle); }
 	Basis(const Vector3 &p_axis, real_t p_angle, const Vector3 &p_scale) { set_axis_angle_scale(p_axis, p_angle, p_scale); }

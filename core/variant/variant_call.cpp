@@ -1990,8 +1990,11 @@ static void _register_variant_builtin_methods_math() {
 
 	/* Vector4 */
 
-	bind_method(Vector4, min_axis_index, sarray(), varray());
-	bind_method(Vector4, max_axis_index, sarray(), varray());
+	METHOD_CLASS(Vector4, min_axis_index, static_cast<Vector4::Axis (Vector4::*)() const>(&Vector4::min_axis_index));
+	register_builtin_method<Method_Vector4_min_axis_index>(sarray(), varray());
+	
+	METHOD_CLASS(Vector4, max_axis_index, static_cast<Vector4::Axis (Vector4::*)() const>(&Vector4::max_axis_index));
+	register_builtin_method<Method_Vector4_max_axis_index>(sarray(), varray());
 	bind_method(Vector4, length, sarray(), varray());
 	bind_method(Vector4, length_squared, sarray(), varray());
 	bind_method(Vector4, abs, sarray(), varray());
@@ -2002,12 +2005,24 @@ static void _register_variant_builtin_methods_math() {
 	bind_method(Vector4, lerp, sarray("to", "weight"), varray());
 	bind_method(Vector4, cubic_interpolate, sarray("b", "pre_a", "post_b", "weight"), varray());
 	bind_method(Vector4, cubic_interpolate_in_time, sarray("b", "pre_a", "post_b", "weight", "b_t", "pre_a_t", "post_b_t"), varray());
-	bind_method(Vector4, posmod, sarray("mod"), varray());
-	bind_method(Vector4, posmodv, sarray("modv"), varray());
-	bind_method(Vector4, snapped, sarray("step"), varray());
-	bind_method(Vector4, snappedf, sarray("step"), varray());
-	bind_method(Vector4, clamp, sarray("min", "max"), varray());
-	bind_method(Vector4, clampf, sarray("min", "max"), varray());
+	// Explicitly cast to specific member function pointers to avoid ambiguity in template deduction
+	METHOD_CLASS(Vector4, posmod, static_cast<Vector4 (Vector4::*)(real_t) const>(&Vector4::posmod));
+	register_builtin_method<Method_Vector4_posmod>(sarray("mod"), varray());
+	
+	METHOD_CLASS(Vector4, posmodv, static_cast<Vector4 (Vector4::*)(const Vector4&) const>(&Vector4::posmodv));
+	register_builtin_method<Method_Vector4_posmodv>(sarray("modv"), varray());
+	
+	METHOD_CLASS(Vector4, snapped, static_cast<Vector4 (Vector4::*)(real_t) const>(&Vector4::snapped));
+	register_builtin_method<Method_Vector4_snapped>(sarray("step"), varray());
+	
+	METHOD_CLASS(Vector4, snappedf, static_cast<Vector4 (Vector4::*)(real_t) const>(&Vector4::snappedf));
+	register_builtin_method<Method_Vector4_snappedf>(sarray("step"), varray());
+	
+	METHOD_CLASS(Vector4, clamp, static_cast<Vector4 (Vector4::*)(real_t, real_t) const>(&Vector4::clamp));
+	register_builtin_method<Method_Vector4_clamp>(sarray("min", "max"), varray());
+	
+	METHOD_CLASS(Vector4, clampf, static_cast<Vector4 (Vector4::*)(real_t, real_t) const>(&Vector4::clampf));
+	register_builtin_method<Method_Vector4_clampf>(sarray("min", "max"), varray());
 	bind_method(Vector4, normalized, sarray(), varray());
 	bind_method(Vector4, is_normalized, sarray(), varray());
 	bind_method(Vector4, direction_to, sarray("to"), varray());

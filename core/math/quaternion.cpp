@@ -14,72 +14,11 @@ Vector3 Quaternion::get_euler(EulerOrder p_order) const {
     return Basis(*this).get_euler(p_order);
 }
 
-#if defined(VECTOR4_USE_SSE)
-Quaternion Quaternion::quaternion_mul_sse(const Quaternion &p_q) const {
-    // Fast Quaternion * Quaternion using SSE vector instructions.
-    // 1) Broadcast 'w' across four lanes (a_wwww) to multiply it by (x,y,z,w) of p_q.
-    // 2) Shuffle other components to handle cross-product parts in parallel.
-    // 3) Add or subtract them appropriately to get x, y, z, w.
-    // This approach uses fewer instructions than a naive scalar loop.
-    __m128 a = components.m_value;
-    __m128 b = p_q.components.m_value;
+// SIMD implementations have been removed for stability
+// Only scalar implementations are used now
 
-    __m128 a_wwww = _mm_shuffle_ps(a, a, _MM_SHUFFLE(3,3,3,3));
-    __m128 a_vzxy = _mm_shuffle_ps(a, a, _MM_SHUFFLE(1,2,0,1));
-    __m128 a_vwyz = _mm_shuffle_ps(a, a, _MM_SHUFFLE(2,1,3,2));
-    
-    __m128 result = _mm_mul_ps(a_wwww, b);
-    
-    __m128 b_yzxw = _mm_shuffle_ps(b, b, _MM_SHUFFLE(3,0,2,1));
-    __m128 b_zxyw = _mm_shuffle_ps(b, b, _MM_SHUFFLE(3,1,0,2));
-    
-    __m128 part2 = _mm_mul_ps(a_vzxy, b_yzxw);
-    __m128 part3 = _mm_mul_ps(a_vwyz, b_zxyw);
-    
-    result = _mm_add_ps(result, part2);
-    result = _mm_sub_ps(result, part3);
-
-    return Quaternion(result);
-}
-#endif
-
-#if defined(VECTOR4_USE_NEON)
-Quaternion Quaternion::quaternion_mul_neon(const Quaternion &p_q) const {
-	// NEON-specific version of Quaternion * Quaternion, analogous to SSE code.
-    // vdupq_laneq_f32() and vextq_f32() help reorder lanes for cross products.
-    float32x4_t a = components.m_value;
-    float32x4_t b = p_q.components.m_value;
-
-    float32x4_t a_wwww = vdupq_laneq_f32(a, 3);
-    float32x4_t a_vzxy = vextq_f32(a, a, 1);
-    float32x4_t a_vwyz = vextq_f32(a, a, 2);
-    
-    float32x4_t result = vmulq_f32(a_wwww, b);
-    
-    float32x4_t b_yzxw = vextq_f32(b, b, 1);
-    float32x4_t b_zxyw = vextq_f32(b, b, 2);
-    
-    float32x4_t part2 = vmulq_f32(a_vzxy, b_yzxw);
-    float32x4_t part3 = vmulq_f32(a_vwyz, b_zxyw);
-    
-    result = vaddq_f32(result, part2);
-    result = vsubq_f32(result, part3);
-
-    return Quaternion(result);
-}
-#endif
-
-Quaternion Quaternion::quaternion_mul_fallback(const Quaternion &p_q) const {
-    return Quaternion(
-		// Scalar fallback for Quaternion * Quaternion.
-    	// This uses four dot products with carefully arranged vectors
-    	// to compute (x, y, z, w) components without SSE/NEON instructions.
-        components.dot(Vector4(p_q.x, p_q.w, p_q.z, -p_q.y)),
-        components.dot(Vector4(p_q.y, p_q.x, p_q.w, -p_q.z)),
-        components.dot(Vector4(p_q.z, p_q.y, p_q.w, -p_q.x)),
-        components.dot(Vector4(p_q.w, -p_q.x, -p_q.y, -p_q.z))
-    );
-}
+// quaternion_mul_fallback is defined in the header
+// Implementation already exists there, so we don't define it here
 
 Quaternion::Quaternion(const Vector3& p_v0, const Vector3& p_v1) {
     Vector3 c = p_v0.cross(p_v1);

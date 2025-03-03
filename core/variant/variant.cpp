@@ -2547,9 +2547,36 @@ Variant::Variant(const Vector3i &p_vector3i) :
 	memnew_placement(_data._mem, Vector3i(p_vector3i));
 }
 
+// Special implementation that avoids using SIMD for Vector4
+class AlignmentSafeVector4 {
+public:
+    float x, y, z, w;
+    
+    AlignmentSafeVector4(const Vector4& p_v) : x(p_v.x), y(p_v.y), z(p_v.z), w(p_v.w) {}
+};
+
 Variant::Variant(const Vector4 &p_vector4) : type(VECTOR4) {
-    assert(reinterpret_cast<uintptr_t>(_data._mem) % alignof(Vector4) == 0 && "Alignment mismatch for Vector4");
-    memnew_placement(_data._mem, Vector4(p_vector4));
+    uintptr_t addr = reinterpret_cast<uintptr_t>(_data._mem);
+    if (addr % alignof(Vector4) != 0) {
+        ERR_PRINT(String("CRITICAL ERROR: Variant memory not properly aligned for Vector4: ") + 
+                 String::num_int64(addr) + 
+                 String(" (misalignment: ") + 
+                 String::num_int64(addr % alignof(Vector4)) + 
+                 String(")"));
+                 
+        // Create a temporary safe structure that doesn't use SIMD
+        AlignmentSafeVector4 safe_vector(p_vector4);
+        
+        // Copy manually without using Vector4's constructor
+        float* dest = reinterpret_cast<float*>(_data._mem);
+        dest[0] = safe_vector.x;
+        dest[1] = safe_vector.y; 
+        dest[2] = safe_vector.z;
+        dest[3] = safe_vector.w;
+    } else {
+        // Safe to use constructor because memory is aligned
+        memnew_placement(_data._mem, Vector4(p_vector4));
+    }
 }
 
 Variant::Variant(const Vector4i &p_vector4i) :
@@ -2594,9 +2621,37 @@ Variant::Variant(const Basis &p_matrix) :
 	memnew_placement(_data._basis, Basis(p_matrix));
 }
 
+// Special implementation that avoids using SIMD for Quaternion
+class AlignmentSafeQuaternion {
+public:
+    float x, y, z, w;
+    
+    AlignmentSafeQuaternion(const Quaternion& p_q) : x(p_q.x), y(p_q.y), z(p_q.z), w(p_q.w) {}
+};
+
 Variant::Variant(const Quaternion &p_quaternion) :
 		type(QUATERNION) {
-	memnew_placement(_data._mem, Quaternion(p_quaternion));
+    uintptr_t addr = reinterpret_cast<uintptr_t>(_data._mem);
+    if (addr % alignof(Quaternion) != 0) {
+        ERR_PRINT(String("CRITICAL ERROR: Variant memory not properly aligned for Quaternion: ") + 
+                 String::num_int64(addr) + 
+                 String(" (misalignment: ") + 
+                 String::num_int64(addr % alignof(Quaternion)) + 
+                 String(")"));
+                 
+        // Create a temporary safe structure that doesn't use SIMD
+        AlignmentSafeQuaternion safe_quat(p_quaternion);
+        
+        // Copy manually without using Quaternion's constructor
+        float* dest = reinterpret_cast<float*>(_data._mem);
+        dest[0] = safe_quat.x;
+        dest[1] = safe_quat.y; 
+        dest[2] = safe_quat.z;
+        dest[3] = safe_quat.w;
+    } else {
+        // Safe to use constructor because memory is aligned
+        memnew_placement(_data._mem, Quaternion(p_quaternion));
+    }
 }
 
 Variant::Variant(const Transform3D &p_transform) :

@@ -116,6 +116,22 @@ public:
 
 	static _ALWAYS_INLINE_ double pow(double p_x, double p_y) { return ::pow(p_x, p_y); }
 	static _ALWAYS_INLINE_ float pow(float p_x, float p_y) { return ::powf(p_x, p_y); }
+	
+	// Add min/max functions that might be missing
+	static _ALWAYS_INLINE_ float min(float a, float b) { return a < b ? a : b; }
+	static _ALWAYS_INLINE_ double min(double a, double b) { return a < b ? a : b; }
+	static _ALWAYS_INLINE_ int min(int a, int b) { return a < b ? a : b; }
+	static _ALWAYS_INLINE_ float max(float a, float b) { return a > b ? a : b; }
+	static _ALWAYS_INLINE_ double max(double a, double b) { return a > b ? a : b; }
+	static _ALWAYS_INLINE_ int max(int a, int b) { return a > b ? a : b; }
+	
+	// Add sign function that might be missing
+	static _ALWAYS_INLINE_ float sign(float v) { return v < 0 ? -1.0f : (v > 0 ? 1.0f : 0.0f); }
+	static _ALWAYS_INLINE_ double sign(double v) { return v < 0 ? -1.0 : (v > 0 ? 1.0 : 0.0); }
+	static _ALWAYS_INLINE_ int sign(int v) { return v < 0 ? -1 : (v > 0 ? 1 : 0); }
+	
+	// These functions already exist in the codebase
+	// We don't need to define them again
 
 	static _ALWAYS_INLINE_ double log(double p_x) { return ::log(p_x); }
 	static _ALWAYS_INLINE_ float log(float p_x) { return ::logf(p_x); }
